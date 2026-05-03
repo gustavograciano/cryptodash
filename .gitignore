@@ -1,0 +1,17 @@
+bin/
+obj/
+*.user
+.vs/
+.idea/
+.vscode/
+node_modules/
+docs/package-lock.json
+dist/
+.env
+.env.local
+.env.production
+*.db
+*.db-shm
+*.db-wal
+*.log
+.DS_Store

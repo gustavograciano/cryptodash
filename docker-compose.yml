@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cryptodash-postgres
+    environment:
+      POSTGRES_DB: cryptodash
+      POSTGRES_USER: cryptodash
+      POSTGRES_PASSWORD: cryptodash
+    ports:
+      - "5432:5432"
+    volumes:
+      - cryptodash_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cryptodash -d cryptodash"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: src/CryptoDash.Api/Dockerfile
+    container_name: cryptodash-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Default: Host=postgres;Port=5432;Database=cryptodash;Username=cryptodash;Password=cryptodash
+      Jwt__Key: ${JWT_KEY:-dev-only-key-change-me-please-min-32-characters-long}
+      Jwt__Issuer: cryptodash
+      Jwt__Audience: cryptodash
+      Jwt__ExpiryMinutes: 10080
+      Seed__UserEmail: ${SEED_EMAIL:-gustavo@cryptodash.local}
+      Seed__UserPassword: ${SEED_PASSWORD:-ChangeMe@123}
+      CoinGecko__BaseUrl: https://api.coingecko.com/api/v3
+      Cors__Origins__0: http://localhost:5173
+    ports:
+      - "5000:8080"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: cryptodash-frontend
+    depends_on:
+      - api
+    environment:
+      VITE_API_URL: http://localhost:5000/api/v1
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  cryptodash_pg:

@@ -1,0 +1,82 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cryptodash-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cryptodash}
+      POSTGRES_USER: ${POSTGRES_USER:-cryptodash}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?password obrigatorio}
+    volumes:
+      - cryptodash_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  api:
+    build:
+      context: .
+      dockerfile: src/CryptoDash.Api/Dockerfile
+    container_name: cryptodash-api
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Default: Host=postgres;Port=5432;Database=${POSTGRES_DB:-cryptodash};Username=${POSTGRES_USER:-cryptodash};Password=${POSTGRES_PASSWORD}
+      Jwt__Key: ${JWT_KEY:?32+ chars obrigatorio}
+      Jwt__Issuer: cryptodash
+      Jwt__Audience: cryptodash
+      Jwt__ExpiryMinutes: 10080
+      Seed__UserEmail: ${SEED_EMAIL}
+      Seed__UserPassword: ${SEED_PASSWORD}
+      CryptoPanic__ApiKey: ${CRYPTOPANIC_API_KEY:-}
+      Anthropic__ApiKey: ${ANTHROPIC_API_KEY:-}
+      Anthropic__Model: ${ANTHROPIC_MODEL:-claude-sonnet-4-5}
+      Cors__Origins__0: ${PUBLIC_URL:-https://cryptodash.local}
+    expose:
+      - "8080"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: /api/v1
+    container_name: cryptodash-frontend
+    restart: unless-stopped
+    expose:
+      - "80"
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: cryptodash-nginx
+    restart: unless-stopped
+    depends_on: [api, frontend]
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/letsencrypt:/etc/letsencrypt:ro
+
+  backup:
+    image: postgres:16-alpine
+    container_name: cryptodash-backup
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-cryptodash}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-cryptodash}
+    volumes:
+      - ./backups:/backups
+      - ./deploy/scripts/backup.sh:/usr/local/bin/backup.sh:ro
+    entrypoint: ["/bin/sh", "-c", "while true; do /usr/local/bin/backup.sh; sleep 86400; done"]
+
+volumes:
+  cryptodash_pg:
