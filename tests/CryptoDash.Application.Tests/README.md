@@ -9,9 +9,23 @@ aritmética que estes testes cobrem.
 dotnet test tests/CryptoDash.Application.Tests
 ```
 
-## Estado atual: 24 verdes · 7 vermelhos
+## Estado atual: 38 verdes · 7 vermelhos
 
 > Invariantes **3, 5 e 7 corrigidas**. Restam 2 e 6.
+>
+> Somam-se 14 testes de **execução de aporte** (`AportExecutionInvariantTests`), todos verdes:
+> idempotência, atomicidade e validação server-side. Ver a seção no fim.
+
+## Armadilhas da fixture (leia antes de escrever teste novo)
+
+**`SumAsync` sobre coluna `decimal` não é confiável no SQLite.** O provider guarda decimal
+como TEXT e a agregação em SQL devolve valor errado — um teste chegou a comparar 300 contra
+210. Some no cliente: `(await q.ToListAsync()).Sum(x => x.Campo)`.
+
+**Uma única conexão compartilhada.** `TestDb` abre uma `SqliteConnection(":memory:")` e todos
+os contextos a compartilham. Isso significa que um contexto enxerga escritas **não
+commitadas** de outro — logo a suíte não consegue representar honestamente duas requisições
+genuinamente simultâneas. Corrida real só contra Postgres, em teste de integração.
 
 **Os vermelhos são intencionais.** Eles asseveram o comportamento *correto*, não o atual.
 Cada falha é um bug real da auditoria, reproduzido de forma determinística. À medida que a
@@ -107,6 +121,45 @@ fronteira do banco precisa de teste de integração contra Postgres real.
 
 ## Próxima tranche
 
-Fora do escopo de invariantes, mas antes de qualquer dinheiro real: idempotência do
-`POST /aports/execute`, atomicidade do `ExecuteAsync`, lost update sob concorrência,
-rejeição de preço inválido, e detecção de divergência razão↔posição.
+Antes de qualquer dinheiro real, e ainda sem cobertura:
+
+- **Lost update sob concorrência** em `HoldingRecalculator.ApplyAsync` — read-modify-write do
+  razão inteiro, sem `RowVersion` nem lock. `PortfolioService.CreateTransactionAsync` e
+  `DeleteTransactionAsync` ainda fazem esse par sem transação.
+- **Sanity check de preço** no `PriceSnapshotJob`: hoje qualquer número da CoinGecko entra no
+  banco. O aporte já recusa preço ≤ 0, mas um preço 10× errado passa.
+- **Reconciliação** razão ↔ posição, com alerta e bloqueio — nada detecta divergência.
+- **Comando de recálculo de posição.** `ApplyAsync` só roda dentro de escrita; não existe
+  caminho para reparar uma posição divergente sem reeditar transações.
+
+## Execução de aporte — idempotência e atomicidade
+
+`AportExecutionInvariantTests`, 14 casos verdes. A propriedade central: **uma intenção de
+aporte produz no máximo um conjunto de transações, e ou produz todas ou não produz nenhuma.**
+
+Como funciona:
+
+- **Chave de idempotência sob índice único.** Vem do header `Idempotency-Key`; na ausência
+  dele o servidor deriva `nat:{planId}:{executedAt até o minuto}` — o que protege o bundle
+  já publicado, porque o modal congela `executedAt` no mount. Quem arbitra duplicatas é o
+  banco, não um `SELECT` antes do `INSERT`: em READ COMMITTED, duas requisições simultâneas
+  passariam as duas pelo `SELECT`.
+- **Fingerprint do payload.** Mesma chave + mesmo conteúdo devolve a resposta original
+  (`replayed: true`). Mesma chave + conteúdo diferente é **409**, não replay — devolver o
+  resultado antigo faria um aporte real desaparecer sem erro e sem rastro.
+- **Uma única fronteira transacional.** A chave é reivindicada no primeiro `SaveChanges`,
+  junto com as transações, para que o perdedor de uma corrida pare no índice único antes de
+  segurar lock em qualquer holding. Moedas são processadas em ordem de `CoinId` para não
+  gerar deadlock entre dois aportes concorrentes.
+- **Fail-closed.** Moeda sem cotação recusa o aporte inteiro em vez de pulá-la em silêncio;
+  a soma das alocações tem de fechar com o total; plano inativo, valor negativo, moeda
+  repetida e quantidade que arredonda para zero são recusados. `AmountBrl` gravado é a soma
+  real das transações, nunca o número enviado pelo cliente.
+
+### Limites conhecidos
+
+- **Corrida genuinamente paralela não é coberta** (ver armadilhas da fixture). O caminho
+  índice-único → catch → replay é exercitado de forma sequencial.
+- **A migration foi verificada à mão contra Postgres real** (aplicada sobre uma tabela com
+  linhas pré-existentes, conferindo backfill, `NOT NULL` e rejeição de duplicata). Não há
+  teste automatizado de migration — dev usa `EnsureCreated` e nunca as exercita.

@@ -89,13 +89,29 @@ namespace CryptoDash.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("amount_brl");
 
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
                     b.Property<DateTimeOffset>("ExecutedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("executed_at");
 
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("idempotency_key");
+
                     b.Property<int>("PlanId")
                         .HasColumnType("integer")
                         .HasColumnName("plan_id");
+
+                    b.Property<string>("RequestFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("request_fingerprint");
 
                     b.Property<List<int>>("TransactionIds")
                         .IsRequired()
@@ -104,6 +120,10 @@ namespace CryptoDash.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_aports_executed");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_aports_executed_idempotency_key");
 
                     b.HasIndex("PlanId")
                         .HasDatabaseName("ix_aports_executed_plan_id");

@@ -14,3 +14,10 @@ export interface NextAportDto {
   daysUntil: number;
   suggested: AportAllocationDto[];
 }
+export interface ExecuteAportResponse {
+  aportExecutedId: number;
+  transactionIds: number[];
+  amountBrl: number;
+  /** Verdadeiro quando o aporte já estava registrado e nada novo foi gravado. */
+  replayed: boolean;
+}

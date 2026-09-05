@@ -9,11 +9,18 @@ export default function AportExecuteModal({ onClose }: { onClose: () => void }) 
   const [executedAt, setExecutedAt] = useState(new Date().toISOString().slice(0, 16));
   const [error, setError] = useState<string | null>(null);
 
+  // Uma chave por abertura do modal — não por clique. É o que faz o reenvio depois de um
+  // timeout (ou depois de o usuário corrigir a data) ser reconhecido como a MESMA operação
+  // em vez de virar um segundo aporte.
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
+
   const m = useMutation({
-    mutationFn: aportsApi.execute,
-    onSuccess: () => {
+    mutationFn: (req: Parameters<typeof aportsApi.execute>[0]) => aportsApi.execute(req, idempotencyKey),
+    onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ['portfolio'] });
       qc.invalidateQueries({ queryKey: ['aports'] });
+      // Fechar em silêncio faria uma repetição parecer um aporte novo.
+      if (res?.replayed) window.alert('Este aporte já estava registrado. Nada foi gravado de novo.');
       onClose();
     },
     onError: (e: any) => setError(e?.response?.data?.error ?? 'Erro ao executar aporte'),
