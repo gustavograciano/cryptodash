@@ -56,20 +56,50 @@ uma CSP que quebra a aplicação é removida na primeira emergência e nunca vol
 aqui é `script-src 'self'` — é isso que contém exfiltração de token por XSS, que é o vetor real
 dado que o JWT vive em `localStorage`.
 
-## ⚠️ Verificação PENDENTE
+## Verificação executada
 
-O critério da spec exige `nginx -t` em container e **isso não foi executado**: o daemon do
-Docker parou de responder durante esta sessão. A configuração foi revisada à mão, mas
-**não está validada**.
+`nginx:1.27-alpine`, template processado pelo entrypoint oficial, upstreams resolvidos com
+`--add-host` e certificado autoassinado gerado no container.
 
-Antes de subir:
+### 1. Sintaxe
 
-```bash
-docker run --rm -e PUBLIC_HOST=seu.dominio -e NGINX_ENVSUBST_OUTPUT_DIR=/etc/nginx \
-  -v "$PWD/deploy/nginx/nginx.conf.template:/etc/nginx/templates/nginx.conf.template:ro" \
-  nginx:1.27-alpine /docker-entrypoint.sh nginx -t
+```
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
 ```
 
-Um ponto a conferir nessa validação: o `envsubst` da imagem substitui apenas variáveis que
-existam no ambiente, então `$host`, `$scheme` e afins passam intactos — mas isso deixa de valer
-se alguém definir uma variável de ambiente com esses nomes.
+### 2. O desafio ACME é servido em HTTP — o defeito que a spec existe para corrigir
+
+| Requisição | Resultado |
+|---|---|
+| `GET /.well-known/acme-challenge/TESTE123` | **HTTP 200** com o conteúdo do token |
+| `GET /portfolio` | **HTTP 301** → `https://…/portfolio` |
+
+O `location ^~` vence o `location /`, então o certbot consegue renovar e todo o resto continua
+sendo empurrado para HTTPS.
+
+### 3. Cabeçalhos de segurança
+
+Os seis presentes na resposta HTTPS, e com `always` — valem também em resposta de erro:
+
+```
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: geolocation=(), microphone=(), camera=()
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; …
+```
+
+### 4. O risco do envsubst não se concretizou
+
+Era a dúvida registrada aqui: se o `envsubst` da imagem comeria as variáveis do próprio nginx.
+No arquivo gerado elas estão **intactas** — `$binary_remote_addr`, `$uri`, `$host`,
+`$request_uri`, `$remote_addr`, `$proxy_add_x_forwarded_for`, `$scheme` — e nenhum
+`PUBLIC_HOST` ficou por substituir. O script só substitui nomes que existam no ambiente.
+
+> Nota sobre o teste: `frontend` foi mapeado para `127.0.0.1`, então o nginx faz proxy para a
+> própria porta 80 e a resposta observada é o 301 daquele bloco. É artefato do arranjo de
+> teste, não da configuração — o que se media ali eram os cabeçalhos, aplicados por cima.
+
+**Status: concluída.**
