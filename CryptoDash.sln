@@ -13,6 +13,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CryptoDash.Infrastructure",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CryptoDash.Api", "src\CryptoDash.Api\CryptoDash.Api.csproj", "{5845ED0C-0796-45A2-A621-3C1F28FEC03A}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{41A07E64-9A99-4E7D-808D-75D8EAC4D489}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CryptoDash.Application.Tests", "tests\CryptoDash.Application.Tests\CryptoDash.Application.Tests.csproj", "{A04D601C-F65E-495D-A85E-AAEDF79E0EDB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -71,6 +75,18 @@ Global
 		{5845ED0C-0796-45A2-A621-3C1F28FEC03A}.Release|x64.Build.0 = Release|Any CPU
 		{5845ED0C-0796-45A2-A621-3C1F28FEC03A}.Release|x86.ActiveCfg = Release|Any CPU
 		{5845ED0C-0796-45A2-A621-3C1F28FEC03A}.Release|x86.Build.0 = Release|Any CPU
+		{A04D601C-F65E-495D-A85E-AAEDF79E0EDB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A04D601C-F65E-495D-A85E-AAEDF79E0EDB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A04D601C-F65E-495D-A85E-AAEDF79E0EDB}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A04D601C-F65E-495D-A85E-AAEDF79E0EDB}.Debug|x64.Build.0 = Debug|Any CPU
+		{A04D601C-F65E-495D-A85E-AAEDF79E0EDB}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A04D601C-F65E-495D-A85E-AAEDF79E0EDB}.Debug|x86.Build.0 = Debug|Any CPU
+		{A04D601C-F65E-495D-A85E-AAEDF79E0EDB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A04D601C-F65E-495D-A85E-AAEDF79E0EDB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A04D601C-F65E-495D-A85E-AAEDF79E0EDB}.Release|x64.ActiveCfg = Release|Any CPU
+		{A04D601C-F65E-495D-A85E-AAEDF79E0EDB}.Release|x64.Build.0 = Release|Any CPU
+		{A04D601C-F65E-495D-A85E-AAEDF79E0EDB}.Release|x86.ActiveCfg = Release|Any CPU
+		{A04D601C-F65E-495D-A85E-AAEDF79E0EDB}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -80,5 +96,6 @@ Global
 		{3B47497D-3C1E-4310-82D5-23EDF4FAE95A} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{D67E25D5-3232-4FBF-B9BE-BF642CEF25CE} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{5845ED0C-0796-45A2-A621-3C1F28FEC03A} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{A04D601C-F65E-495D-A85E-AAEDF79E0EDB} = {41A07E64-9A99-4E7D-808D-75D8EAC4D489}
 	EndGlobalSection
 EndGlobal
