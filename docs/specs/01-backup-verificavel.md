@@ -32,3 +32,20 @@ silenciosa apagam os últimos backups bons.
 
 Criptografia e cópia offsite — importantes, mas são mudança de infraestrutura, não do script.
 Registrar como pendência.
+
+---
+
+## Verificação executada
+
+Postgres 16 em container, schema com uma tabela e uma linha.
+
+| Cenário | Script antigo | Script novo |
+|---|---|---|
+| Caminho feliz | arquivo gravado | `exit=0`, arquivo de 830 bytes gravado **e verificado** |
+| `pg_dump` falha (senha errada) | **arquivo de 20 bytes gravado, `exit=0`, imprime "gravado em"** | `exit=1`, **nenhum arquivo**, backup anterior preservado |
+
+O piso de tamanho foi calibrado durante a verificação: 1024 bytes chegou a rejeitar um dump
+**válido** de 826 bytes. Baixado para 200 — um dump falho comprimido tem ~20 bytes, e a
+guarda semântica real é o `grep CREATE TABLE`.
+
+**Status: concluída.**
