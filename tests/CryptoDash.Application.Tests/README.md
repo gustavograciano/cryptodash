@@ -9,9 +9,9 @@ aritmética que estes testes cobrem.
 dotnet test tests/CryptoDash.Application.Tests
 ```
 
-## Estado atual: 18 verdes · 13 vermelhos
+## Estado atual: 24 verdes · 7 vermelhos
 
-> Invariantes **3 e 5 corrigidas** — ver `HoldingRecalculator`. Restam 2, 6 e 7.
+> Invariantes **3, 5 e 7 corrigidas**. Restam 2 e 6.
 
 **Os vermelhos são intencionais.** Eles asseveram o comportamento *correto*, não o atual.
 Cada falha é um bug real da auditoria, reproduzido de forma determinística. À medida que a
@@ -30,7 +30,7 @@ regra de negócio mudou — e isso é uma decisão, não um ajuste.
 | 4 | Delete reproduz a posição sem aquela transação | 🟢 | — |
 | 5 | Venda > posição é rejeitada | 🟢 3/3 | **corrigido** |
 | 6 | Custo médio nunca zera com quantidade > 0 | 🔴 2/2 | `Math.Round(totalCost/qty, 2)` destrói a base de custo |
-| 7 | Variação 24h bate com o cálculo independente | 🔴 6/8 | Álgebra usa o preço de hoje como base do ontem |
+| 7 | Variação 24h bate com o cálculo independente | 🟢 8/8 | **corrigido** |
 
 ## Invariantes 3 e 5 — como foram corrigidas
 
@@ -60,6 +60,25 @@ serem absorvidos em silêncio.
 > ⚠️ **Pendência conhecida.** `GetSummaryAsync` filtra `Where(h => h.Quantity > 0)`, então uma
 > posição negativa vinda de dados legados sumiria do dashboard em vez de gritar. Vale uma
 > verificação de integridade na base existente antes de considerar o assunto encerrado.
+
+## Invariante 7 — como foi corrigida
+
+A variação de 24h é reconstruída a partir do preço de **ontem**, posição a posição:
+`P_ontem = P_hoje / (1 + c/100)` e `variação = qty × (P_hoje − P_ontem)`. A base do
+percentual passa a ser o valor de ontem somado diretamente, não derivado por subtração.
+
+O cálculo anterior aplicava o percentual sobre o valor de hoje. O erro cresce com a
+variação: superestimava o ganho em 35% numa alta de 35%, escondia R$ 8.000 de prejuízo
+numa queda de 40%, exibia `0,00%` numa alta de 100% (`prevTotal` virava exatamente zero e
+caía na guarda) e invertia o sinal acima disso.
+
+Posições sem preço, ou com variação ≤ −100%, não têm preço anterior definido e ficam fora
+dos **dois** lados da conta — não contaminam nem a variação nem a base.
+
+> ⚠️ **Limitação que permanece.** O cálculo assume que a quantidade de hoje era a mesma
+> ontem. No dia do aporte, a cripto comprada minutos antes entra na conta como se estivesse
+> em carteira há 24 horas. Corrigir isso exige persistir o valor da carteira diariamente —
+> é mudança de modelo, não de fórmula, e está fora desta suíte.
 
 ## O que cada vermelho restante está dizendo
 

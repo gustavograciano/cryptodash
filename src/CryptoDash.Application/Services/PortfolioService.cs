@@ -22,15 +22,32 @@ public class PortfolioService(IAppDbContext db)
         var totalPnl = totalBrl - totalCost;
         var totalPnlPct = totalCost == 0 ? 0 : Math.Round((totalPnl / totalCost) * 100m, 2);
 
-        var change24hBrl = holdings.Sum(h =>
+        // Variação de 24h reconstruída a partir do preço de ONTEM, posição a posição:
+        //   P_ontem = P_hoje / (1 + c/100)   e   variação = qty * (P_hoje − P_ontem)
+        //
+        // O cálculo anterior aplicava o percentual sobre o valor de HOJE (qty * P_hoje * c),
+        // usando a base errada. O erro cresce com c: superestimava o ganho em 35% numa alta
+        // de 35%, escondia R$ 8.000 de prejuízo numa queda de 40%, exibia 0,00% numa alta de
+        // 100% (prevTotal virava exatamente zero e caía na guarda) e invertia o sinal acima
+        // disso (prevTotal negativo).
+        //
+        // Posições sem preço, ou com variação <= −100%, não têm preço anterior definido:
+        // ficam fora dos DOIS lados da conta, para não contaminar nem a variação nem a base.
+        decimal valorAtualComparavel = 0m;
+        decimal valorOntem = 0m;
+        foreach (var h in holdings)
         {
             var price = h.Coin.PriceSnapshot?.PriceBrl ?? 0m;
             var change = h.Coin.PriceSnapshot?.Change24hPct ?? 0m;
-            var value = h.Quantity * price;
-            return value * change / 100m;
-        });
-        var prevTotal = totalBrl - change24hBrl;
-        var change24hPct = prevTotal == 0 ? 0 : Math.Round((change24hBrl / prevTotal) * 100m, 2);
+            var fator = 1m + change / 100m;
+            if (price <= 0m || fator <= 0m) continue;
+
+            valorAtualComparavel += h.Quantity * price;
+            valorOntem += h.Quantity * (price / fator);
+        }
+
+        var change24hBrl = valorAtualComparavel - valorOntem;
+        var change24hPct = valorOntem == 0m ? 0m : Math.Round((change24hBrl / valorOntem) * 100m, 2);
 
         var holdingDtos = holdings.Select(h =>
         {
