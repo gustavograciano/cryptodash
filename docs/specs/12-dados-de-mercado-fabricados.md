@@ -44,3 +44,31 @@ indistinguíveis de dado real.
    ou repetição do fechamento.
 3. **Indicadores:** se `fear` for nulo, não escrever esses campos; se ambos os feeds falharem,
    não gravar linha nenhuma e logar em `Warning`.
+
+---
+
+## Verificação executada
+
+5 casos em `MarketDataFabricationTests`, com cliente falso da CoinGecko — sem rede.
+
+| Caso | Antes | Agora |
+|---|---|---|
+| 4 leituras rolantes de ~500 mil | volume 2.025.000 (soma) | **520.000** (última leitura) |
+| Vela com 2+ pontos | indistinguível | `HasIntraday = true`, high/low reais |
+| Vela com 1 ponto | high/low = fechamento, sem aviso | `HasIntraday = false` |
+| Preço de R$ 0,00007 | zerado pelo arredondamento em 2 casas | preservado (10 casas) |
+
+`MarketIndicatorsJob` deixou de gravar ficção: sem nenhum feed, **não grava linha** e loga em
+`Warning`; sem Fear & Greed e sem linha existente, não cria linha só com dominância, porque a
+data da linha vem do próprio Fear & Greed e seria palpite.
+
+### Dado histórico
+
+O default `false` de `has_intraday` é conservador: linhas antigas não passam a alegar extremos
+que não se pode provar. O `PriceHistoryJob` reescreve a janela recente a cada execução, então
+o histórico próximo se corrige sozinho.
+
+**Volume antigo permanece inflado** em até ~24× fora dessa janela. Não alimenta nenhum
+indicador hoje — `IndicatorCalculator` usa apenas fechamentos —, mas está registrado.
+
+**Status: concluída.**

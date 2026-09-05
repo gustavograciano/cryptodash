@@ -38,6 +38,7 @@ public class PriceHistoryJob(AppDbContext db, IMarketDataFeed feed, ILogger<Pric
                     row.LowBrl = p.Low;
                     row.CloseBrl = p.Close;
                     row.VolumeBrl = p.Volume;
+                    row.HasIntraday = p.HasIntraday;
                 }
                 else
                 {
@@ -49,7 +50,8 @@ public class PriceHistoryJob(AppDbContext db, IMarketDataFeed feed, ILogger<Pric
                         HighBrl = p.High,
                         LowBrl = p.Low,
                         CloseBrl = p.Close,
-                        VolumeBrl = p.Volume
+                        VolumeBrl = p.Volume,
+                        HasIntraday = p.HasIntraday
                     });
                 }
             }

@@ -28,7 +28,7 @@ aporte).
 |---|---|---|---|
 | 10 | [Segredos fora do versionamento](10-segredos-fora-do-versionamento.md) | auditoria de segurança | ✅ |
 | 11 | [TLS renovável e cabeçalhos](11-tls-renovavel-e-cabecalhos.md) | CRIT-20 | ⚠️ |
-| 12 | [Dados de mercado fabricados](12-dados-de-mercado-fabricados.md) | CRIT-14/15/16 | ⬜ |
+| 12 | [Dados de mercado fabricados](12-dados-de-mercado-fabricados.md) | CRIT-14/15/16 | ✅ |
 | 13 | [Resiliência HTTP](13-resiliencia-http.md) | INT-01 | ⬜ |
 | 14 | [Validação e conteúdo de terceiros](14-validacao-e-conteudo-de-terceiros.md) | SEC-06 | ⬜ |
 | 15 | [Correções de interface](15-correcoes-de-interface.md) | FE | ⬜ |

@@ -11,4 +11,11 @@ public class PriceHistory
     public decimal LowBrl { get; set; }
     public decimal CloseBrl { get; set; }
     public decimal VolumeBrl { get; set; }
+
+    /// <summary>
+    /// Falso quando a fonte devolveu um único ponto para o dia: High e Low são repetição do
+    /// fechamento, não extremos reais. Sem esta marca, a mesma coluna teria semânticas
+    /// diferentes conforme a granularidade da janela pedida à CoinGecko.
+    /// </summary>
+    public bool HasIntraday { get; set; } = true;
 }

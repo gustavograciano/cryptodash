@@ -394,6 +394,10 @@ namespace CryptoDash.Infrastructure.Persistence.Migrations
                         .HasColumnType("date")
                         .HasColumnName("date");
 
+                    b.Property<bool>("HasIntraday")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_intraday");
+
                     b.Property<decimal>("HighBrl")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
