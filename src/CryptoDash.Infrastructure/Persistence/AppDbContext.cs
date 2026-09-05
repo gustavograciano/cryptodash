@@ -22,18 +22,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<AiDigest> AiDigests => Set<AiDigest>();
     public DbSet<User> Users => Set<User>();
 
-    public async Task<IAppTransaction> BeginTransactionAsync(CancellationToken ct = default)
-        => new EfAppTransaction(await Database.BeginTransactionAsync(ct));
-
-    public void ClearTracking() => ChangeTracker.Clear();
-
-    private sealed class EfAppTransaction(Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction inner) : IAppTransaction
-    {
-        public Task CommitAsync(CancellationToken ct = default) => inner.CommitAsync(ct);
-        public Task RollbackAsync(CancellationToken ct = default) => inner.RollbackAsync(ct);
-        public ValueTask DisposeAsync() => inner.DisposeAsync();
-    }
-
     protected override void OnModelCreating(ModelBuilder b)
     {
         var isPostgres = Database.IsNpgsql();
