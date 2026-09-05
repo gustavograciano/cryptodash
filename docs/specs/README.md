@@ -11,7 +11,7 @@ aporte).
 | # | Spec | Bloqueador | Estado |
 |---|---|---|---|
 | 01 | [Backup verificável](01-backup-verificavel.md) | #6 backup falha em silêncio | ✅ |
-| 02 | [Fuso horário do ExecutedAt](02-fuso-horario-executedat.md) | achado novo | ⬜ |
+| 02 | [Fuso horário do ExecutedAt](02-fuso-horario-executedat.md) | achado novo | ✅ |
 | 03 | [Sanity check de preço](03-sanity-check-preco.md) | #4 | ⬜ |
 | 04 | [Atomicidade e lost update](04-atomicidade-portfolio.md) | #3 | ⬜ |
 | 05 | [Reconciliação razão↔posição](05-reconciliacao.md) | #1 | ⬜ |

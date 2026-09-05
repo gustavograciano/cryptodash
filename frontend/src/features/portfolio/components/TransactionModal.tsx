@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { portfolioApi } from '../api';
 import type { TransactionType } from '../types';
+import { paraDatetimeLocal } from '@/lib/format';
 
 export default function TransactionModal({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient();
@@ -12,7 +13,7 @@ export default function TransactionModal({ onClose }: { onClose: () => void }) {
   const [quantity, setQuantity] = useState('');
   const [priceBrl, setPriceBrl] = useState('');
   const [feeBrl, setFeeBrl] = useState('0');
-  const [executedAt, setExecutedAt] = useState(new Date().toISOString().slice(0, 16));
+  const [executedAt, setExecutedAt] = useState(paraDatetimeLocal());
   const [notes, setNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
 

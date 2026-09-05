@@ -53,3 +53,26 @@ Extrair para `frontend/src/lib/format.ts` e usar nos dois modais.
 Registros existentes têm o deslocamento embutido e **não** são corrigidos por esta spec —
 seria preciso saber o fuso de cada lançamento. Documentar como pendência e avisar o usuário:
 transações lançadas antes desta correção têm `ExecutedAt` adiantado pelo offset local.
+
+---
+
+## Verificação executada
+
+Instalado `vitest` no frontend — não havia harness de teste algum. 6 casos em
+`src/lib/format.test.ts`, verdes com `TZ=America/Sao_Paulo`.
+
+Comparação direta das duas implementações, usuário escolhendo 05/09/2026 14:30 local:
+
+| | valor no input | ExecutedAt enviado | desvio |
+|---|---|---|---|
+| Antigo | `2026-09-05T17:30` (errado) | `2026-09-05T20:30Z` | **+3h** |
+| Novo | `2026-09-05T14:30` | `2026-09-05T17:30Z` | 0h |
+
+Virada de ano, compra em 31/12 às 22h local:
+
+| | data registrada |
+|---|---|
+| Antigo | **2027-01-01** — ano fiscal errado |
+| Novo | 2026-12-31 |
+
+**Status: concluída.** Dados já gravados não foram corrigidos — ver seção acima.
