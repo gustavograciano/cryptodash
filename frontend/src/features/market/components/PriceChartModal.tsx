@@ -8,7 +8,7 @@ type Range = '30d' | '90d' | '1y';
 
 export default function PriceChartModal({ symbol, onClose }: { symbol: string; onClose: () => void }) {
   const [range, setRange] = useState<Range>('90d');
-  const { data = [], isLoading } = useQuery({
+  const { data = [], isLoading, isError } = useQuery({
     queryKey: ['history', symbol, range],
     queryFn: () => marketApi.history(symbol, range),
   });
@@ -32,6 +32,12 @@ export default function PriceChartModal({ symbol, onClose }: { symbol: string; o
         <div className="h-72">
           {isLoading ? (
             <p className="text-sm text-muted">Carregando...</p>
+          ) : isError ? (
+            // Antes, falha de API caía no ramo de lista vazia e mandava o usuário aguardar
+            // um job que não ia resolver nada.
+            <p className="text-sm text-alert">
+              Não foi possível carregar o histórico. Verifique a conexão e tente de novo.
+            </p>
           ) : chartData.length === 0 ? (
             <p className="text-sm text-muted">Sem histórico — aguarde o job rodar.</p>
           ) : (

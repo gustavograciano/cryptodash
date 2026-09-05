@@ -35,3 +35,32 @@ não é desestruturado: em 500, 401 ou rede caída, `data` cai no default `[]` e
    direita, que é o arco efetivamente desenhado. Extrair para função pura e testar.
 2. Desestruturar `error` e renderizar estado de erro distinto do vazio.
 3. Rotular a coluna como desvio relativo ao alvo.
+
+---
+
+## Verificação executada
+
+7 casos em `FearGreedGauge.test.ts`. Frontend: **18/18**.
+
+O ângulo foi extraído para `anguloDoPonteiro`, função pura e testada:
+
+| Índice | Antes | Agora |
+|---|---|---|
+| 0 (medo extremo) | apontava para cima | esquerda, `x ≈ 30` |
+| 50 (neutro) | **direita — extremo de ganância** | cima, `y ≈ 30` |
+| 100 (ganância extrema) | **para baixo, `y = 170`, fora da viewBox** | direita, `x ≈ 170` |
+
+Um teste varre os 101 valores e exige que a ponta nunca saia da metade superior do desenho;
+outro prova o bug antigo diretamente, comparando as duas fórmulas. Valores fora de 0–100 são
+presos aos extremos — o índice vem de fonte externa e um valor absurdo não pode jogar a agulha
+para fora.
+
+`PriceChartModal` passou a desestruturar `isError` e mostrar mensagem de falha distinta do
+estado vazio: antes, erro de API caía no ramo "Sem histórico — aguarde o job rodar" e mandava
+o usuário esperar por algo que não viria.
+
+A coluna passou a se chamar **"Desvio rel. ao alvo"**, com `title` explicando a fórmula — ela
+é uma razão sobre o alvo, e estava sendo impressa com o mesmo formatador das colunas "Atual" e
+"Alvo", que são percentuais absolutos do portfólio.
+
+**Status: concluída.**
