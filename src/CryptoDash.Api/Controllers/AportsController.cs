@@ -39,9 +39,20 @@ public class AportsController(AportsService aports, PortfolioService portfolio) 
     }
 
     [HttpPost("execute")]
-    public async Task<IActionResult> Execute([FromBody] ExecuteAportRequest req, CancellationToken ct)
+    public async Task<IActionResult> Execute(
+        [FromBody] ExecuteAportRequest req,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        CancellationToken ct)
     {
-        var r = await aports.ExecuteAsync(req, ct);
-        return r.Success ? Ok(r.Value) : BadRequest(new { error = r.Error });
+        // A chave é transporte, não regra de negócio: vem no header para que os próximos
+        // endpoints de escrita financeira ganhem a mesma proteção sem mexer em DTO.
+        var r = await aports.ExecuteAsync(req with { IdempotencyKey = idempotencyKey }, ct);
+        if (r.Success) return Ok(r.Value);
+
+        // Reuso da mesma chave com outro conteúdo é conflito, não erro de validação:
+        // o cliente precisa saber que a operação anterior existe e não foi substituída.
+        return r.Error?.StartsWith(AportsService.ConflitoDeChave, StringComparison.Ordinal) == true
+            ? Conflict(new { error = r.Error })
+            : BadRequest(new { error = r.Error });
     }
 }

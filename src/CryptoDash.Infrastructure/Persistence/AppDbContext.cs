@@ -112,6 +112,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             e.Property(p => p.AmountBrl).HasPrecision(18, 2);
             e.HasOne(p => p.Plan).WithMany().HasForeignKey(p => p.PlanId);
+
+            // Fora do guard de provider de propósito: o índice único precisa existir também
+            // no SQLite criado por EnsureCreated, para que os testes exercitem o MESMO
+            // mecanismo de arbitragem de duplicatas que roda em produção.
+            e.Property(p => p.IdempotencyKey).HasMaxLength(64).IsRequired();
+            e.HasIndex(p => p.IdempotencyKey).IsUnique();
+            e.Property(p => p.RequestFingerprint).HasMaxLength(64).IsRequired();
             if (isPostgres)
                 e.Property(p => p.TransactionIds).HasColumnType("integer[]");
             else
