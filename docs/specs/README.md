@@ -26,7 +26,7 @@ aporte).
 
 | # | Spec | Origem | Estado |
 |---|---|---|---|
-| 10 | [Segredos fora do versionamento](10-segredos-fora-do-versionamento.md) | auditoria de segurança | ⬜ |
+| 10 | [Segredos fora do versionamento](10-segredos-fora-do-versionamento.md) | auditoria de segurança | ✅ |
 | 11 | [TLS renovável e cabeçalhos](11-tls-renovavel-e-cabecalhos.md) | CRIT-20 | ⬜ |
 | 12 | [Dados de mercado fabricados](12-dados-de-mercado-fabricados.md) | CRIT-14/15/16 | ⬜ |
 | 13 | [Resiliência HTTP](13-resiliencia-http.md) | INT-01 | ⬜ |
