@@ -12,6 +12,12 @@ namespace CryptoDash.Application.Services;
 
 public class AportsService(IAppDbContext db)
 {
+    /// <summary>
+    /// Teto de sanidade do aporte mensal. Não é regra de negócio — é proteção contra dedo
+    /// gordo, na ausência de qualquer confirmação na interface.
+    /// </summary>
+    public const decimal TetoDoAporte = 10_000_000m;
+
     public async Task<AportPlanDto?> GetPlanAsync(CancellationToken ct = default)
     {
         var plan = await db.AportPlans.OrderByDescending(p => p.Id).FirstOrDefaultAsync(p => p.IsActive, ct);
@@ -21,6 +27,14 @@ public class AportsService(IAppDbContext db)
     public async Task<AportPlanDto> UpsertPlanAsync(UpdateAportPlanRequest req, CancellationToken ct = default)
     {
         if (req.DayOfMonth < 1 || req.DayOfMonth > 28) throw new ArgumentException("dayOfMonth deve estar entre 1 e 28");
+
+        // O dia era validado e o dinheiro não. Um amountBrl negativo era persistido com 200 e
+        // depois o DcaAllocator caía na guarda `aporteBrl <= 0`, devolvia lista vazia, e o card
+        // de aporte — o recurso principal do produto — morria em silêncio, sem erro na tela.
+        if (req.AmountBrl <= 0m)
+            throw new ArgumentException("amountBrl deve ser maior que zero");
+        if (req.AmountBrl > TetoDoAporte)
+            throw new ArgumentException($"amountBrl acima do teto de {TetoDoAporte:N0}");
         var plan = await db.AportPlans.OrderByDescending(p => p.Id).FirstOrDefaultAsync(ct);
         if (plan is null)
         {

@@ -36,3 +36,32 @@ humano para decidir aporte. Uma manchete construída para isso pode alterar o re
 2. Delimitar as notícias em bloco marcado e instruir o modelo, no system prompt, a tratar tudo
    dentro dele como dado a resumir — nunca como instrução. **Não é blindagem completa**;
    reduz a superfície e é o que cabe sem um segundo modelo de verificação.
+
+---
+
+## Verificação executada
+
+5 casos em `PlanValidationTests`, verdes. Suíte: **113/113**.
+
+Cobertos: valor negativo, zero, acima do teto, dia inválido (a validação que já existia não
+podia se perder na mudança) e — o mais importante — **plano inválido não sobrescreve o plano
+que estava funcionando**, porque a validação roda antes de qualquer escrita.
+
+O teto de R$ 10.000.000 não é regra de negócio: é proteção contra dedo gordo, na ausência de
+qualquer confirmação na interface.
+
+### Prompt injection
+
+O conteúdo de terceiros passou a ir dentro de `<noticias>...</noticias>`, com instrução no
+system prompt para tratar tudo ali como **dado a resumir, nunca como instrução**, e para
+ignorar texto que peça mudança de comportamento ou recomendação de compra e venda.
+
+`Sanitizar` neutraliza `<` e `>` (para `‹` e `›`) e colapsa quebras de linha, impedindo que uma
+manchete **feche o delimitador** e escreva fora dele — a forma mais direta de texto de terceiros
+virar instrução.
+
+**Isto não é blindagem.** Nada em delimitação é: reduz a superfície. Defesa real exigiria um
+segundo modelo verificando a saída, o que está fora do escopo desta fase — e o digest continua
+sendo texto não verificado que o usuário lê antes de decidir aporte.
+
+**Status: concluída.**
