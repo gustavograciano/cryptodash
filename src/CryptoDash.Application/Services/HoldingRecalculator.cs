@@ -87,7 +87,10 @@ public static class HoldingRecalculator
             }
         }
 
-        var avgCost = qty > 0m ? Math.Round(totalCost / qty, 2) : 0m;
+        // 10 casas, não 2: arredondar a média em centavos zerava a base de custo de qualquer
+        // moeda sub-centavo e, mesmo em moeda barata comum, injetava deriva multiplicada pela
+        // quantidade.
+        var avgCost = qty > 0m ? Math.Round(totalCost / qty, 10) : 0m;
         return new HoldingState(qty, totalCost, avgCost, wentNegative);
     }
 
@@ -111,6 +114,7 @@ public static class HoldingRecalculator
                 CoinId = coinId,
                 Quantity = state.Quantity,
                 AvgCostBrl = state.AvgCostBrl,
+                TotalCostBrl = state.TotalCostBrl,
                 UpdatedAt = DateTimeOffset.UtcNow
             });
         }
@@ -118,6 +122,7 @@ public static class HoldingRecalculator
         {
             holding.Quantity = state.Quantity;
             holding.AvgCostBrl = state.AvgCostBrl;
+            holding.TotalCostBrl = state.TotalCostBrl;
             holding.UpdatedAt = DateTimeOffset.UtcNow;
             // Incremento explícito: é o que faz o UPDATE carregar `WHERE version = @antiga`
             // e falhar quando outra escrita passou na frente.

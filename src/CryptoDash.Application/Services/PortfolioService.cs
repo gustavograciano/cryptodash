@@ -20,7 +20,7 @@ public class PortfolioService(IAppDbContext db)
             .ToListAsync(ct);
 
         var totalBrl = holdings.Sum(h => h.Quantity * (h.Coin.PriceSnapshot?.PriceBrl ?? 0m));
-        var totalCost = holdings.Sum(h => h.Quantity * h.AvgCostBrl);
+        var totalCost = holdings.Sum(h => h.TotalCostBrl);   // fato persistido, não reconstruído
         var totalPnl = totalBrl - totalCost;
         var totalPnlPct = totalCost == 0 ? 0 : Math.Round((totalPnl / totalCost) * 100m, 2);
 
@@ -55,7 +55,7 @@ public class PortfolioService(IAppDbContext db)
         {
             var price = h.Coin.PriceSnapshot?.PriceBrl ?? 0m;
             var value = h.Quantity * price;
-            var cost = h.Quantity * h.AvgCostBrl;
+            var cost = h.TotalCostBrl;
             var pnl = value - cost;
             var pnlPct = cost == 0 ? 0 : Math.Round((pnl / cost) * 100m, 2);
             return new HoldingDto(

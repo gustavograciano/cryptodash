@@ -228,8 +228,8 @@ namespace CryptoDash.Infrastructure.Persistence.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<decimal>("AvgCostBrl")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
+                        .HasPrecision(20, 10)
+                        .HasColumnType("numeric(20,10)")
                         .HasColumnName("avg_cost_brl");
 
                     b.Property<int>("CoinId")
@@ -240,6 +240,11 @@ namespace CryptoDash.Infrastructure.Persistence.Migrations
                         .HasPrecision(20, 10)
                         .HasColumnType("numeric(20,10)")
                         .HasColumnName("quantity");
+
+                    b.Property<decimal>("TotalCostBrl")
+                        .HasPrecision(20, 10)
+                        .HasColumnType("numeric(20,10)")
+                        .HasColumnName("total_cost_brl");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -456,13 +461,13 @@ namespace CryptoDash.Infrastructure.Persistence.Migrations
                         .HasColumnName("market_cap_brl");
 
                     b.Property<decimal>("PriceBrl")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
+                        .HasPrecision(20, 10)
+                        .HasColumnType("numeric(20,10)")
                         .HasColumnName("price_brl");
 
                     b.Property<decimal>("PriceUsd")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
+                        .HasPrecision(20, 10)
+                        .HasColumnType("numeric(20,10)")
                         .HasColumnName("price_usd");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
@@ -546,8 +551,8 @@ namespace CryptoDash.Infrastructure.Persistence.Migrations
                         .HasColumnName("notes");
 
                     b.Property<decimal>("PriceBrl")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
+                        .HasPrecision(20, 10)
+                        .HasColumnType("numeric(20,10)")
                         .HasColumnName("price_brl");
 
                     b.Property<decimal>("Quantity")
