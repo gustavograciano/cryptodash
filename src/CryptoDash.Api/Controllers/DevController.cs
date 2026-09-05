@@ -3,6 +3,7 @@ using CryptoDash.Application.Services;
 using CryptoDash.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
 using Quartz;
 
 namespace CryptoDash.Api.Controllers;
@@ -10,8 +11,24 @@ namespace CryptoDash.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/v1/dev")]
-public class DevController(ISchedulerFactory schedulerFactory, NewsService news, IAppDbContext db) : ControllerBase
+public class DevController(
+    ISchedulerFactory schedulerFactory,
+    NewsService news,
+    IAppDbContext db,
+    IWebHostEnvironment env) : ControllerBase, IActionFilter
 {
+    /// <summary>
+    /// Fora de Development este controller não existe. Em produção ele permitia injetar
+    /// notícias fabricadas no cache que alimenta o digest de IA lido para decidir aporte, e
+    /// disparar jobs em rajada — ban da CoinGecko e gasto de créditos da Anthropic.
+    /// </summary>
+    public void OnActionExecuting(ActionExecutingContext context)
+    {
+        if (!env.IsDevelopment()) context.Result = NotFound();
+    }
+
+    public void OnActionExecuted(ActionExecutedContext context) { }
+
     [HttpPost("seed-news")]
     public async Task<IActionResult> SeedNews(CancellationToken ct)
     {

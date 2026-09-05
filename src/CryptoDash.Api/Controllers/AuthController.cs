@@ -2,6 +2,7 @@ using CryptoDash.Application.DTOs;
 using CryptoDash.Application.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace CryptoDash.Api.Controllers;
 
@@ -10,6 +11,7 @@ namespace CryptoDash.Api.Controllers;
 public class AuthController(AuthService auth) : ControllerBase
 {
     [AllowAnonymous]
+    [EnableRateLimiting("login")]
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest req, CancellationToken ct)
     {

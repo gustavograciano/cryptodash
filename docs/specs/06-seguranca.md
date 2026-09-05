@@ -36,3 +36,31 @@
 ## Fora de escopo
 
 Refresh token, revogação, RBAC e `UserId` nas entidades — são a Fase 3 do roadmap.
+
+---
+
+## Verificação executada
+
+16 casos em `StartupValidationTests`. Suíte total: **91 casos, 84 verdes**.
+
+Boot verificado de verdade, rodando a API:
+
+| Cenário | Resultado |
+|---|---|
+| Production sem `JWT_KEY` | `InvalidOperationException: Jwt:Key ausente...` |
+| Production com chave de 5 chars | `Jwt:Key tem 5 caracteres; o mínimo para HMAC-SHA256 é 32` |
+| Production com `SEED_PASSWORD=ChangeMe@123` | `senha de exemplo publicada no repositório` |
+| Development | sobe normalmente, 7 jobs agendados |
+
+## Decisão: validação consciente do ambiente
+
+Remover a chave do `appsettings.json` quebrava o loop local — `docker compose up` e
+`dotnet run` usavam justamente os valores de exemplo. A recusa de **valor publicado** passou a
+valer só fora de Development; **não-vazio e comprimento mínimo valem em todo ambiente**, senão
+o dev rodaria um sistema diferente do que vai para produção.
+
+Os valores de desenvolvimento foram para `appsettings.Development.json`, que só é lido quando
+`ASPNETCORE_ENVIRONMENT=Development` e portanto não pode vazar para produção.
+
+**Status: concluída.** Refresh token, revogação e `UserId` nas entidades continuam fora de
+escopo (Fase 3).

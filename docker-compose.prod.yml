@@ -31,8 +31,8 @@ services:
       Jwt__Issuer: cryptodash
       Jwt__Audience: cryptodash
       Jwt__ExpiryMinutes: 10080
-      Seed__UserEmail: ${SEED_EMAIL}
-      Seed__UserPassword: ${SEED_PASSWORD}
+      Seed__UserEmail: ${SEED_EMAIL:?email do usuario inicial obrigatorio}
+      Seed__UserPassword: ${SEED_PASSWORD:?senha do usuario inicial obrigatoria}
       CryptoPanic__ApiKey: ${CRYPTOPANIC_API_KEY:-}
       Anthropic__ApiKey: ${ANTHROPIC_API_KEY:-}
       Anthropic__Model: ${ANTHROPIC_MODEL:-claude-sonnet-4-5}

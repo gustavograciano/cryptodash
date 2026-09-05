@@ -5,6 +5,9 @@ using CryptoDash.Infrastructure;
 using CryptoDash.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using System.Threading.RateLimiting;
+using CryptoDash.Infrastructure.Configuration;
+using Microsoft.AspNetCore.RateLimiting;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,8 +20,12 @@ builder.Host.UseSerilog((ctx, cfg) => cfg
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
-var jwtKey = builder.Configuration["Jwt:Key"]
-             ?? throw new InvalidOperationException("Jwt:Key ausente");
+// Falha alto e cedo. Os guards anteriores eram inalcançáveis: o `?? throw` nunca disparava
+// porque o appsettings sempre fornecia a chave, e a senha de seed vazia não dispara `??`.
+var jwtKey = builder.Configuration["Jwt:Key"];
+var ehDesenvolvimento = builder.Environment.IsDevelopment();
+StartupValidation.ValidarChaveJwt(jwtKey, permitirValorDeExemplo: ehDesenvolvimento);
+StartupValidation.ValidarSenhaDeSeed(builder.Configuration["Seed:UserPassword"], permitirValorDeExemplo: ehDesenvolvimento);
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "cryptodash";
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "cryptodash";
 
@@ -39,6 +46,16 @@ builder.Services
         };
     });
 builder.Services.AddAuthorization();
+
+// Login sem limite permitia brute force ilimitado — e o e-mail da única conta era público
+// no bundle do frontend, então o atacante só precisava adivinhar a senha.
+builder.Services.AddRateLimiter(o =>
+{
+    o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    o.AddPolicy("login", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        ctx.Connection.RemoteIpAddress?.ToString() ?? "desconhecido",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(1) }));
+});
 
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p
     .WithOrigins(builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? new[] { "http://localhost:5173" })
@@ -70,6 +87,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseSerilogRequestLogging();
+app.UseRateLimiter();
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
