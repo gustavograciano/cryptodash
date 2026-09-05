@@ -40,3 +40,29 @@ uma posição divergente sem reeditar transações.
 ## Fora de escopo
 
 Reconciliação contra fonte externa (corretora) — não há integração e não haverá nesta fase.
+
+---
+
+## Verificação executada
+
+7 casos em `ReconciliationTests`, verdes. Suíte total: **72 casos, 65 verdes**; os 7 vermelhos
+seguem sendo as invariantes 2 e 6.
+
+Entregue:
+
+- `ReconciliationService.CheckAsync` — compara por moeda, detecta divergência de quantidade
+  **e** posição ausente para moeda com razão
+- `ReconciliationService.RecalculateAsync(coinId?)` — reparo, dentro de transação
+- `ReconciliationJob` — de hora em hora, log em `Error` nomeando moeda, magnitude e a ação
+  corretiva
+- `GET /api/v1/portfolio/reconciliation` — **409** quando há divergência, não 200: um 200
+  faria monitoramento externo tratar o estado corrompido como normal
+- `POST /api/v1/portfolio/holdings/recalculate`
+- `GetSummaryAsync` passou de `Quantity > 0` para `Quantity != 0`
+
+O sinal da diferença é informação: positivo significa que a posição afirma ter **mais** cripto
+do que o razão comprova — a direção que infla o patrimônio exibido.
+
+A soma é feita no cliente de propósito: `SUM` sobre `decimal` no SQLite devolve valor errado.
+
+**Status: concluída.**

@@ -103,6 +103,13 @@ public static class DependencyInjection
                 .WithIdentity("AIDigestJob-trigger")
                 .WithCronSchedule("0 0 7 * * ?"));
 
+            var recKey = new JobKey("ReconciliationJob");
+            q.AddJob<ReconciliationJob>(opts => opts.WithIdentity(recKey));
+            q.AddTrigger(t => t.ForJob(recKey)
+                .WithIdentity("ReconciliationJob-trigger")
+                .StartAt(DateTimeOffset.UtcNow.AddMinutes(5))
+                .WithCronSchedule("0 30 * * * ?"));
+
             var remKey = new JobKey("AportReminderJob");
             q.AddJob<AportReminderJob>(opts => opts.WithIdentity(remKey));
             q.AddTrigger(t => t.ForJob(remKey)

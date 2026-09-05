@@ -14,7 +14,9 @@ public class PortfolioService(IAppDbContext db)
         var holdings = await db.Holdings
             .Include(h => h.Coin).ThenInclude(c => c.PriceSnapshot)
             .Include(h => h.Coin).ThenInclude(c => c.TargetAllocation)
-            .Where(h => h.Quantity > 0)
+            // != 0, não > 0: posição NEGATIVA é o sinal de razão corrompido, e filtrá-la
+            // fazia justamente a evidência do problema sumir do dashboard.
+            .Where(h => h.Quantity != 0)
             .ToListAsync(ct);
 
         var totalBrl = holdings.Sum(h => h.Quantity * (h.Coin.PriceSnapshot?.PriceBrl ?? 0m));

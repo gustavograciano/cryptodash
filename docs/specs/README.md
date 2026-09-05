@@ -14,7 +14,7 @@ aporte).
 | 02 | [Fuso horário do ExecutedAt](02-fuso-horario-executedat.md) | achado novo | ✅ |
 | 03 | [Sanity check de preço](03-sanity-check-preco.md) | #4 | ✅ |
 | 04 | [Atomicidade e lost update](04-atomicidade-portfolio.md) | #3 | ✅ |
-| 05 | [Reconciliação razão↔posição](05-reconciliacao.md) | #1 | ⬜ |
+| 05 | [Reconciliação razão↔posição](05-reconciliacao.md) | #1 | ✅ |
 | 06 | [Endurecimento de segurança](06-seguranca.md) | #7, #8 | ⬜ |
 | 07 | [Base de custo sem deriva](07-base-de-custo.md) | invariante 6 | ⬜ |
 | 08 | [Centavos do primeiro aporte](08-centavos-dca.md) | invariante 2 | ⬜ |
