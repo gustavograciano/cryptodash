@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace CryptoDash.Infrastructure.Configuration;
 
 /// <summary>
@@ -32,7 +34,7 @@ public static class StartupValidation
     /// ambiente; o que muda é a recusa de chaves publicadas, que fora de Development é
     /// inegociável e em Development apenas quebraria o loop local.
     /// </param>
-    public static void ValidarChaveJwt(string? chave, bool permitirValorDeExemplo = false)
+    public static void ValidarChaveJwt([NotNull] string? chave, bool permitirValorDeExemplo = false)
     {
         if (string.IsNullOrWhiteSpace(chave))
             throw new InvalidOperationException(
@@ -48,7 +50,7 @@ public static class StartupValidation
                 "forjar um token válido. Gere uma com `openssl rand -hex 32`.");
     }
 
-    public static void ValidarSenhaDeSeed(string? senha, bool permitirValorDeExemplo = false)
+    public static void ValidarSenhaDeSeed([NotNull] string? senha, bool permitirValorDeExemplo = false)
     {
         if (string.IsNullOrWhiteSpace(senha))
             throw new InvalidOperationException(
