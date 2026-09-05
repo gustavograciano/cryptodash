@@ -15,8 +15,14 @@ public class PriceHistoryJob(AppDbContext db, IMarketDataFeed feed, ILogger<Pric
         var ct = context.CancellationToken;
         var coins = await db.Coins.Where(c => c.IsActive).ToListAsync(ct);
 
+        // Free tier da CoinGecko é ~10-30 req/min. Onze moedas em rajada tinham risco real de
+        // ban do IP, que derruba TODO o pipeline de preço, não só este job.
+        var primeira = true;
         foreach (var coin in coins)
         {
+            if (!primeira) await Task.Delay(TimeSpan.FromSeconds(3), ct);
+            primeira = false;
+
             var lastDate = await db.PriceHistory.Where(p => p.CoinId == coin.Id)
                 .OrderByDescending(p => p.Date).Select(p => (DateOnly?)p.Date).FirstOrDefaultAsync(ct);
             var days = lastDate is null ? 365 : Math.Max(2, (DateOnly.FromDateTime(DateTime.UtcNow.Date).DayNumber - lastDate.Value.DayNumber) + 2);

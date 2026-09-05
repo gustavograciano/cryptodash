@@ -1,5 +1,6 @@
 using CryptoDash.Application.Abstractions;
 using CryptoDash.Infrastructure.Auth;
+using CryptoDash.Infrastructure.External;
 using CryptoDash.Infrastructure.External.AlternativeMe;
 using CryptoDash.Infrastructure.External.Anthropic;
 using CryptoDash.Infrastructure.External.CoinGecko;
@@ -38,34 +39,39 @@ public static class DependencyInjection
         services.AddScoped<IJwtTokenService, JwtTokenService>();
 
         var coingeckoBase = config["CoinGecko:BaseUrl"] ?? "https://api.coingecko.com/api/v3";
-        services.AddRefitClient<ICoinGeckoApi>()
+        ResilienciaHttp.Aplicar(services.AddRefitClient<ICoinGeckoApi>()
             .ConfigureHttpClient(c =>
             {
+                // Timeout por tentativa; o total fica a cargo da política.
                 c.BaseAddress = new Uri(coingeckoBase);
                 c.Timeout = TimeSpan.FromSeconds(15);
                 c.DefaultRequestHeaders.Add("User-Agent", "CryptoDash/1.0");
                 c.DefaultRequestHeaders.Add("Accept", "application/json");
-            });
+            }), tentativas: 3, atrasoBase: TimeSpan.FromSeconds(2), timeoutTotal: TimeSpan.FromSeconds(60));
         services.AddScoped<IPriceFeed, CoinGeckoPriceFeed>();
         services.AddScoped<IMarketDataFeed, CoinGeckoMarketDataFeed>();
 
         var altBase = config["AlternativeMe:BaseUrl"] ?? "https://api.alternative.me";
-        services.AddRefitClient<IAlternativeMeApi>()
+        ResilienciaHttp.Aplicar(services.AddRefitClient<IAlternativeMeApi>()
             .ConfigureHttpClient(c =>
             {
                 c.BaseAddress = new Uri(altBase);
                 c.Timeout = TimeSpan.FromSeconds(15);
-            });
+            }), tentativas: 3, atrasoBase: TimeSpan.FromSeconds(2), timeoutTotal: TimeSpan.FromSeconds(60));
         services.AddScoped<IFearGreedFeed, AlternativeMeFearGreedFeed>();
 
         var cpBase = config["CryptoPanic:BaseUrl"] ?? "https://cryptopanic.com/api/v1";
-        services.AddRefitClient<ICryptoPanicApi>()
-            .ConfigureHttpClient(c => { c.BaseAddress = new Uri(cpBase); c.Timeout = TimeSpan.FromSeconds(15); });
+        ResilienciaHttp.Aplicar(services.AddRefitClient<ICryptoPanicApi>()
+            .ConfigureHttpClient(c => { c.BaseAddress = new Uri(cpBase); c.Timeout = TimeSpan.FromSeconds(15); }),
+            tentativas: 2, atrasoBase: TimeSpan.FromSeconds(3), timeoutTotal: TimeSpan.FromSeconds(60));
         services.AddScoped<INewsFeed, CryptoPanicNewsFeed>();
 
         var anthBase = config["Anthropic:BaseUrl"] ?? "https://api.anthropic.com";
-        services.AddRefitClient<IAnthropicApi>()
-            .ConfigureHttpClient(c => { c.BaseAddress = new Uri(anthBase); c.Timeout = TimeSpan.FromSeconds(60); });
+        // A Anthropic é cara e lenta: uma tentativa extra, não três. Repetir uma geração que
+        // já consumiu tokens é gastar duas vezes pelo mesmo resultado.
+        ResilienciaHttp.Aplicar(services.AddRefitClient<IAnthropicApi>()
+            .ConfigureHttpClient(c => { c.BaseAddress = new Uri(anthBase); c.Timeout = TimeSpan.FromSeconds(60); }),
+            tentativas: 1, atrasoBase: TimeSpan.FromSeconds(5), timeoutTotal: TimeSpan.FromSeconds(150));
         services.AddScoped<ILlmDigestGenerator, AnthropicDigestGenerator>();
 
         services.AddQuartz(q =>
