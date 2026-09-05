@@ -36,3 +36,23 @@ antes do retorno.
 Cuidado com o piso de R$ 5: em aporte pequeno (R$ 0,05) o piso não pode zerar todas as linhas.
 A regra atual só move valor quando existe destino maior; validar que o comportamento
 permanece sensato e que a soma continua fechando.
+
+---
+
+## Verificação executada
+
+`Invariante2c` e `Invariante2d` verdes em todas as sementes. **Suíte inteira verde: 91/91.**
+
+O ramo do primeiro aporte deixou de retornar cedo e passou pelo mesmo caminho de reconciliação
+do ramo normal. O piso por moeda e o ajuste de centavos viraram métodos nomeados, aplicados
+aos três ramos.
+
+Dois detalhes que a extração tornou explícitos:
+
+- **A sobra nunca vai para linha zerada pelo piso.** O código antigo usava
+  `Array.IndexOf(alloc, alloc.Max())`, que podia devolver valor a uma moeda que o piso acabara
+  de esvaziar — desfazendo o próprio piso. Agora a busca ignora zeros.
+- **Aporte minúsculo não evapora.** Se todas as linhas zerarem por arredondamento, a sobra vai
+  para a primeira em vez de o aporte inteiro desaparecer.
+
+**Status: concluída.**

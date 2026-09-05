@@ -17,7 +17,7 @@ aporte).
 | 05 | [Reconciliação razão↔posição](05-reconciliacao.md) | #1 | ✅ |
 | 06 | [Endurecimento de segurança](06-seguranca.md) | #7, #8 | ✅ |
 | 07 | [Base de custo sem deriva](07-base-de-custo.md) | invariante 6 | ✅ |
-| 08 | [Centavos do primeiro aporte](08-centavos-dca.md) | invariante 2 | ⬜ |
+| 08 | [Centavos do primeiro aporte](08-centavos-dca.md) | invariante 2 | ✅ |
 | 09 | [Frescor e alerta](09-frescor-e-alerta.md) | #9 | ⬜ |
 
 ## Regras para estas specs
@@ -26,5 +26,5 @@ aporte).
   quando o item for infraestrutura não testável em unidade (spec 01) — nesse caso, o
   critério é verificação manual documentada.
 - Não afrouxar asserção existente para fazer spec passar. A suíte em
-  `tests/CryptoDash.Application.Tests` é a linha de base: hoje **38 verdes / 7 vermelhos**.
-- Os 7 vermelhos atuais são as invariantes 2 e 6, endereçadas pelas specs 07 e 08.
+  `tests/CryptoDash.Application.Tests` é a linha de base: hoje **91 verdes / 0 vermelhos**.
+- As invariantes 2 e 6 foram fechadas pelas specs 08 e 07 — a suíte está inteiramente verde.
