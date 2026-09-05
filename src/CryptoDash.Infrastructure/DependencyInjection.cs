@@ -70,6 +70,10 @@ public static class DependencyInjection
 
         services.AddQuartz(q =>
         {
+            // Sem listener, exceção em job vira silêncio: o dado do dia não existe e nada
+            // indica por quê.
+            q.AddJobListener<JobFailureListener>();
+
             var snapKey = new JobKey("PriceSnapshotJob");
             q.AddJob<PriceSnapshotJob>(opts => opts.WithIdentity(snapKey));
             q.AddTrigger(t => t.ForJob(snapKey)
@@ -116,6 +120,7 @@ public static class DependencyInjection
                 .WithIdentity("AportReminderJob-trigger")
                 .WithCronSchedule("0 0 9 * * ?"));
         });
+        services.AddSingleton<JobFailureListener>();
         services.AddQuartzHostedService(o => o.WaitForJobsToComplete = true);
 
         return services;

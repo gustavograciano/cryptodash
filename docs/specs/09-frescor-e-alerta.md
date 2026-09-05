@@ -34,3 +34,31 @@ console e o dado do dia não existe.
 
 Métricas, traces e alerta externo (e-mail/Telegram) — Fase 1 do roadmap. Esta spec entrega
 **visibilidade**, não notificação ativa.
+
+---
+
+## Verificação executada
+
+5 casos em `HealthReadinessTests` + 5 em `format.test.ts`. Suíte: **96/96 .NET, 11/11 frontend.**
+
+Entregue:
+
+- `HoldingsCard` exibe a idade do preço sob a cotação; acima de 30 min vira `⚠ há N min` em
+  vermelho. O dado já vinha no DTO e nunca era renderizado.
+- `/health/ready` passa a checar a idade do snapshot mais recente além da conexão: devolve
+  **503 `degraded`** com `priceAgeSeconds` quando o preço passa de 1 hora.
+- `JobFailureListener` registra exceção de job em `Error` — antes, falha de job virava silêncio
+  completo.
+
+### Bug encontrado ao rodar de verdade
+
+A primeira versão do readiness usava `OrderByDescending(p => p.UpdatedAt)` no banco. O SQLite
+**não suporta `ORDER BY` sobre `DateTimeOffset`** e o endpoint devolvia **HTTP 500** em
+Development — readiness quebrado é pior do que readiness ausente. Só apareceu porque a API foi
+levantada e o endpoint chamado; nenhum teste unitário pegaria. Ordenação passou para o cliente.
+
+Verificado ao vivo: `{"status":"ready","priceAgeSeconds":0.95,"maxPriceAgeSeconds":3600}` com
+HTTP 200.
+
+**Status: concluída.** Alerta ativo (e-mail/Telegram) e métricas continuam fora de escopo:
+esta spec entrega visibilidade, não notificação.

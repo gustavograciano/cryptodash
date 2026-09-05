@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { paraDatetimeLocal } from './format';
+import { PRECO_OBSOLETO_MINUTOS, idadeDoPreco, paraDatetimeLocal } from './format';
 
 /**
  * O ciclo real do produto: o valor vai para um `<input type="datetime-local">`, o usuário
@@ -57,5 +57,35 @@ describe('paraDatetimeLocal', () => {
     // Só há divergência fora do UTC; em UTC o bug era invisível, e é por isso que passou.
     if (desvioHoras !== 0) expect(formatoAntigo).not.toBe(paraDatetimeLocal(d));
     else expect(formatoAntigo).toBe(paraDatetimeLocal(d));
+  });
+});
+
+describe('idadeDoPreco', () => {
+  const minutosAtras = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
+
+  it('sem cotação é tratado como obsoleto', () => {
+    expect(idadeDoPreco(null).obsoleto).toBe(true);
+    expect(idadeDoPreco(undefined).texto).toBe('sem cotação');
+  });
+
+  it('preço recente não é obsoleto', () => {
+    const r = idadeDoPreco(minutosAtras(5));
+    expect(r.obsoleto).toBe(false);
+    expect(r.texto).toBe('há 5 min');
+  });
+
+  it('acima do limiar vira obsoleto', () => {
+    // O job roda a cada 15 min: 45 min sem atualizar significa que ele parou.
+    expect(idadeDoPreco(minutosAtras(45)).obsoleto).toBe(true);
+  });
+
+  it('a fronteira do limiar é obsoleta', () => {
+    expect(idadeDoPreco(minutosAtras(PRECO_OBSOLETO_MINUTOS)).obsoleto).toBe(true);
+    expect(idadeDoPreco(minutosAtras(PRECO_OBSOLETO_MINUTOS - 1)).obsoleto).toBe(false);
+  });
+
+  it('escala para horas e dias', () => {
+    expect(idadeDoPreco(minutosAtras(120)).texto).toBe('há 2 h');
+    expect(idadeDoPreco(minutosAtras(60 * 24 * 3)).texto).toBe('há 3 d');
   });
 });
