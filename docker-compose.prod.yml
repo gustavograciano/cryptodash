@@ -58,9 +58,15 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    environment:
+      # A imagem oficial roda envsubst sobre /etc/nginx/templates/*.template e escreve o
+      # resultado em NGINX_ENVSUBST_OUTPUT_DIR. É o que tira o domínio de dentro do arquivo.
+      PUBLIC_HOST: ${PUBLIC_HOST:?dominio publico obrigatorio, ex: cryptodash.exemplo.com}
+      NGINX_ENVSUBST_OUTPUT_DIR: /etc/nginx
     volumes:
-      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/nginx/nginx.conf.template:/etc/nginx/templates/nginx.conf.template:ro
       - ./deploy/letsencrypt:/etc/letsencrypt:ro
+      - ./deploy/certbot-www:/var/www/certbot
 
   backup:
     image: postgres:16-alpine

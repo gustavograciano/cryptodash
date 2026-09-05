@@ -1,0 +1,81 @@
+events { worker_connections 1024; }
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+    sendfile on;
+    keepalive_timeout 65;
+    server_tokens off;
+
+    # Rate limit na borda. A API já limita o login por IP, mas isso protege o
+    # processo inteiro antes de a requisição chegar ao Kestrel.
+    limit_req_zone $binary_remote_addr zone=api:10m rate=20r/s;
+    limit_req_status 429;
+
+    upstream cryptodash_api { server api:8080; }
+    upstream cryptodash_web { server frontend:80; }
+
+    server {
+        listen 80;
+        server_name _;
+
+        # O desafio HTTP-01 do certbot PRECISA ser servido em HTTP puro. Um `return 301`
+        # incondicional — que era o que existia aqui — engolia este caminho, a renovação
+        # falhava e o certificado expirava em 90 dias, derrubando o site sozinho.
+        location ^~ /.well-known/acme-challenge/ {
+            root /var/www/certbot;
+            default_type "text/plain";
+            try_files $uri =404;
+        }
+
+        location / {
+            return 301 https://$host$request_uri;
+        }
+    }
+
+    server {
+        listen 443 ssl;
+        http2 on;
+        server_name ${PUBLIC_HOST};
+
+        ssl_certificate     /etc/letsencrypt/live/${PUBLIC_HOST}/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/${PUBLIC_HOST}/privkey.pem;
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_prefer_server_ciphers on;
+        ssl_session_cache shared:SSL:10m;
+        ssl_session_timeout 1d;
+
+        # HSTS: sem ele, a primeira visita de cada sessão sai em HTTP puro quando o usuário
+        # digita o domínio sem esquema, e o token vai junto no redirect.
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
+
+        # CSP deliberadamente permissiva em 'unsafe-inline' para estilo: React e Recharts
+        # injetam estilo inline, e uma CSP que quebra a aplicação é removida na primeira
+        # emergência e nunca volta. O que importa aqui é travar script a origem própria —
+        # é isso que contém exfiltração de token por XSS.
+        add_header Content-Security-Policy
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
+
+        client_max_body_size 2m;
+
+        location /api/ {
+            limit_req zone=api burst=40 nodelay;
+
+            proxy_pass http://cryptodash_api;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_read_timeout 60s;
+        }
+
+        location / {
+            proxy_pass http://cryptodash_web;
+            proxy_set_header Host $host;
+        }
+    }
+}
