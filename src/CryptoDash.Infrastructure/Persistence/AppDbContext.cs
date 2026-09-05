@@ -51,6 +51,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasIndex(h => h.CoinId).IsUnique();
             e.Property(h => h.Quantity).HasPrecision(20, 10);
             e.Property(h => h.AvgCostBrl).HasPrecision(18, 2);
+            e.Property(h => h.Version).IsConcurrencyToken();
             e.HasOne(h => h.Coin).WithOne(c => c.Holding)
                 .HasForeignKey<Holding>(h => h.CoinId);
         });

@@ -51,3 +51,31 @@ mais tempo antes de commitar.
 
 `DbUpdateConcurrencyException` **herda** de `DbUpdateException`. O `catch (DbUpdateException)`
 do `ExecuteAsync` a captura hoje; verificar que o fluxo de idempotência não a engole.
+
+---
+
+## Verificação executada
+
+5 casos em `ConcurrencyInvariantTests`, verdes. Suíte total: **65 casos, 58 verdes**, os 7
+vermelhos continuam sendo as invariantes 2 e 6 (specs 08 e 07).
+
+O token de concorrência é provado no nível do EF: dois contextos carregam a mesma posição,
+o primeiro salva, o segundo levanta `DbUpdateConcurrencyException` em vez de vencer com dado
+obsoleto. Antes desta spec, o segundo simplesmente sobrescrevia.
+
+Cadeia completa de migrations aplicada do zero contra Postgres 16: `holdings.version integer
+not null default 0`.
+
+### Decisão sobre o token
+
+Coluna gerenciada pela aplicação em vez do `xmin` do Postgres. O `xmin` não custa schema, mas
+não existe no SQLite — e a suíte inteira roda em SQLite. Uma coluna explícita faz o mecanismo
+ser **idêntico** nos dois providers, então o teste exercita o que roda em produção.
+
+### O cast virou helper
+
+`DbTransactionScope` em `Application/Common` concentra o cast `IAppDbContext -> DbContext`,
+que agora aparecia em dois lugares. Era exatamente o critério do desenho aprovado: promover à
+abstração depois da segunda ocorrência, não antes.
+
+**Status: concluída.**

@@ -119,6 +119,9 @@ public static class HoldingRecalculator
             holding.Quantity = state.Quantity;
             holding.AvgCostBrl = state.AvgCostBrl;
             holding.UpdatedAt = DateTimeOffset.UtcNow;
+            // Incremento explícito: é o que faz o UPDATE carregar `WHERE version = @antiga`
+            // e falhar quando outra escrita passou na frente.
+            holding.Version++;
         }
     }
 

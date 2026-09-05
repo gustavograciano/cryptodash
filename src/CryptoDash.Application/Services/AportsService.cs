@@ -206,18 +206,11 @@ public class AportsService(IAppDbContext db)
             CreatedAt = DateTimeOffset.UtcNow
         };
 
-        // A fronteira transacional é obtida por cast em vez de exposta em IAppDbContext.
-        // A premissa é verdadeira por construção — AppDbContext é a única implementação da
-        // interface e a DI registra literalmente a mesma instância — mas é uma premissa de
-        // RUNTIME: um provider sem suporte a transação (InMemory) ou uma segunda
-        // implementação falhariam aqui, não na compilação. Por isso a checagem é explícita
-        // e falha alto, em vez de degradar em silêncio para escrita sem transação.
-        if (db is not DbContext ctx)
-            throw new InvalidOperationException(
-                "IAppDbContext precisa ser um DbContext para que a execução de aporte seja atômica.");
-
+        // Fronteira transacional via DbTransactionScope: o cast para DbContext vive lá, agora
+        // que PortfolioService precisa do mesmo — era o critério do desenho aprovado,
+        // promover à abstração depois da segunda ocorrência.
         var comitou = false;
-        await using var trx = await ctx.Database.BeginTransactionAsync(ct);
+        await using var trx = await DbTransactionScope.BeginAsync(db, ct);
         try
         {
             // A chave é reivindicada no PRIMEIRO save, junto com as transações: o perdedor
@@ -244,7 +237,7 @@ public class AportsService(IAppDbContext db)
             // chave passou a existir. Se passou, perdemos a corrida — devolvemos a resposta
             // do vencedor. Se não, a exceção era outra coisa e precisa subir.
             await trx.RollbackAsync(CancellationToken.None);
-            ctx.ChangeTracker.Clear();
+            DbTransactionScope.ClearTracking(db);
 
             var vencedor = await db.AportsExecuted.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.IdempotencyKey == chave, ct);
@@ -255,7 +248,7 @@ public class AportsService(IAppDbContext db)
         {
             // Qualquer caminho que não comitou — cancelamento, timeout, falha no commit —
             // deixaria entidades rastreadas que um SaveChanges posterior ressuscitaria.
-            if (!comitou) ctx.ChangeTracker.Clear();
+            if (!comitou) DbTransactionScope.ClearTracking(db);
         }
 
         return Result<ExecuteAportResponse>.Ok(
