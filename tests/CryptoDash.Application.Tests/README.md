@@ -9,7 +9,9 @@ aritmética que estes testes cobrem.
 dotnet test tests/CryptoDash.Application.Tests
 ```
 
-## Estado atual: 13 verdes · 16 vermelhos
+## Estado atual: 18 verdes · 13 vermelhos
+
+> Invariantes **3 e 5 corrigidas** — ver `HoldingRecalculator`. Restam 2, 6 e 7.
 
 **Os vermelhos são intencionais.** Eles asseveram o comportamento *correto*, não o atual.
 Cada falha é um bug real da auditoria, reproduzido de forma determinística. À medida que a
@@ -20,27 +22,46 @@ regra de negócio mudou — e isso é uma decisão, não um ajuste.
 
 ## Placar por invariante
 
-| # | Invariante | Estado | Bug que expõe |
+| # | Invariante | Estado | Bug |
 |---|---|---|---|
-| 1 | `Σ compras − Σ vendas == Holding.Quantity` | 🟢 3/3 | — (vale enquanto não há venda a descoberto) |
+| 1 | `Σ compras − Σ vendas == Holding.Quantity` | 🟢 3/3 | — |
 | 2 | `Σ alocações do DCA == aporte` | 🔴 5/9 | Ramo do primeiro aporte retorna antes da reconciliação de centavos |
-| 3 | Custo médio determinístico com `ExecutedAt` empatado | 🔴 | **0 BTC vs 1 BTC** para o mesmo conjunto de transações |
+| 3 | Custo médio determinístico com `ExecutedAt` empatado | 🟢 2/2 | **corrigido** |
 | 4 | Delete reproduz a posição sem aquela transação | 🟢 | — |
-| 5 | Venda > posição é rejeitada | 🔴 2/2 | `Math.Min` trunca em silêncio; razão e posição divergem |
+| 5 | Venda > posição é rejeitada | 🟢 3/3 | **corrigido** |
 | 6 | Custo médio nunca zera com quantidade > 0 | 🔴 2/2 | `Math.Round(totalCost/qty, 2)` destrói a base de custo |
 | 7 | Variação 24h bate com o cálculo independente | 🔴 6/8 | Álgebra usa o preço de hoje como base do ontem |
 
-## O que cada vermelho está dizendo
+## Invariantes 3 e 5 — como foram corrigidas
 
-**Invariante 3 — o mais grave.** Uma compra e uma venda de 1 BTC com o mesmo `ExecutedAt`
-produzem holding de **0 BTC** se a compra foi inserida primeiro e **1 BTC** se a venda foi.
-O `OrderBy(t => t.ExecutedAt)` é estável, então quem desempata é a ordem de inserção.
-Correção: critério de desempate determinístico (`ThenBy(t => t.Id)`) e tratar venda sem
-posição como erro, não como no-op.
+Ambas viviam no mesmo `RecalculateHoldingAsync`, que existia **duplicado literalmente** em
+`PortfolioService` e `AportsService`. As duas cópias foram substituídas por
+`HoldingRecalculator`, fonte única da verdade.
 
-**Invariante 5 — a divergência sempre infla.** Comprar 1 BTC, vender 1,5 e comprar 1 deixa
-o razão em 0,5 BTC e o holding em 1,0 BTC. O excedente some sem erro, e o erro é sempre a
-favor de mostrar mais cripto do que existe.
+**Ordem canônica do razão.** O replay agora ordena por `ExecutedAt`, depois **compras antes
+de vendas no mesmo instante**, depois `Id`. O critério do meio é o que torna o resultado
+independente da ordem de digitação: não se pode alienar o que ainda não foi adquirido, então
+processar a aquisição primeiro é a única leitura coerente de dois eventos carimbados no mesmo
+momento. O `ThenBy(t => t.Id)` fecha o desempate para operações do mesmo tipo — sem ele o
+resultado dependeria da ordem em que o banco devolve as linhas, que não é garantida sem
+`ORDER BY`.
+
+**Venda a descoberto é rejeitada, não truncada.** `CreateTransactionAsync` simula o razão
+inteiro com a transação candidata antes de persistir e recusa a operação se a posição ficaria
+negativa em qualquer ponto. Simular o razão inteiro (e não apenas a posição corrente) é o que
+pega o lançamento **retroativo**: uma venda pode ter lastro no instante dela e ainda assim
+deixar sem lastro uma venda posterior — coberto por `Invariante5c`.
+
+**O replay ficou fiel.** A quantidade inteira da venda é subtraída mesmo quando excede a
+posição, em vez de truncada por `Math.Min`. Assim razão e posição nunca contam histórias
+diferentes; dados corrompidos de antes da correção aparecem como posição negativa em vez de
+serem absorvidos em silêncio.
+
+> ⚠️ **Pendência conhecida.** `GetSummaryAsync` filtra `Where(h => h.Quantity > 0)`, então uma
+> posição negativa vinda de dados legados sumiria do dashboard em vez de gritar. Vale uma
+> verificação de integridade na base existente antes de considerar o assunto encerrado.
+
+## O que cada vermelho restante está dizendo
 
 **Invariante 6 — dois níveis.** O zeramento total (moeda a R$ 0,00007 → custo médio R$ 0,00)
 é latente: só arma se alguém cadastrar moeda barata direto no banco. Mas o **6b é ativo

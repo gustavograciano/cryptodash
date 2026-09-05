@@ -139,10 +139,26 @@ public class PortfolioService(IAppDbContext db)
             Notes = req.Notes,
             CreatedAt = DateTimeOffset.UtcNow
         };
+
+        // Alienação sem lastro é rejeitada, nunca truncada em silêncio. A simulação
+        // considera o razão inteiro, e não apenas a posição atual, porque um lançamento
+        // retroativo pode zerar uma posição intermediária sem alterar o saldo final.
+        if (req.Type == TransactionType.Sell && await HoldingRecalculator.WouldGoNegativeAsync(db, tx, ct))
+        {
+            var posicaoAtual = await db.Holdings
+                .Where(h => h.CoinId == req.CoinId)
+                .Select(h => (decimal?)h.Quantity)
+                .FirstOrDefaultAsync(ct) ?? 0m;
+
+            return Result<TransactionDto>.Fail(
+                $"Venda de {req.Quantity} {coin.Symbol} excede a posição disponível em " +
+                $"{req.ExecutedAt:yyyy-MM-dd HH:mm} (posição atual: {posicaoAtual}).");
+        }
+
         db.Transactions.Add(tx);
         await db.SaveChangesAsync(ct);
 
-        await RecalculateHoldingAsync(req.CoinId, ct);
+        await HoldingRecalculator.ApplyAsync(db, req.CoinId, ct);
         await db.SaveChangesAsync(ct);
 
         return Result<TransactionDto>.Ok(new TransactionDto(
@@ -173,52 +189,8 @@ public class PortfolioService(IAppDbContext db)
         var coinId = tx.CoinId;
         db.Transactions.Remove(tx);
         await db.SaveChangesAsync(ct);
-        await RecalculateHoldingAsync(coinId, ct);
+        await HoldingRecalculator.ApplyAsync(db, coinId, ct);
         await db.SaveChangesAsync(ct);
         return Result<bool>.Ok(true);
-    }
-
-    private async Task RecalculateHoldingAsync(int coinId, CancellationToken ct)
-    {
-        var txs = (await db.Transactions.Where(t => t.CoinId == coinId).ToListAsync(ct)).OrderBy(t => t.ExecutedAt).ToList();
-        decimal qty = 0m;
-        decimal totalCost = 0m;
-        foreach (var t in txs)
-        {
-            if (t.Type == TransactionType.Buy)
-            {
-                totalCost += t.TotalBrl + t.FeeBrl;
-                qty += t.Quantity;
-            }
-            else
-            {
-                if (qty > 0)
-                {
-                    var avg = totalCost / qty;
-                    var sellQty = Math.Min(t.Quantity, qty);
-                    totalCost -= avg * sellQty;
-                    qty -= sellQty;
-                }
-            }
-        }
-        var avgCost = qty > 0 ? Math.Round(totalCost / qty, 2) : 0m;
-
-        var holding = await db.Holdings.FirstOrDefaultAsync(h => h.CoinId == coinId, ct);
-        if (holding is null)
-        {
-            db.Holdings.Add(new Holding
-            {
-                CoinId = coinId,
-                Quantity = qty,
-                AvgCostBrl = avgCost,
-                UpdatedAt = DateTimeOffset.UtcNow
-            });
-        }
-        else
-        {
-            holding.Quantity = qty;
-            holding.AvgCostBrl = avgCost;
-            holding.UpdatedAt = DateTimeOffset.UtcNow;
-        }
     }
 }

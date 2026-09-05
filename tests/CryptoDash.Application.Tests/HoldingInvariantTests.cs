@@ -1,5 +1,6 @@
 using CryptoDash.Application.DTOs;
 using CryptoDash.Application.Services;
+using CryptoDash.Domain.Entities;
 using CryptoDash.Domain.Enums;
 using Xunit;
 
@@ -20,6 +21,8 @@ public class HoldingInvariantTests
         => new(coinId, TransactionType.Sell, qty, price, fee, at, null);
 
     private static readonly DateTimeOffset T0 = new(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset T1 = T0.AddDays(3);
+    private static readonly DateTimeOffset T2 = T0.AddDays(6);
 
     // ─────────────────────────────────────────────────────────────────────────
     // INVARIANTE 1 — Σ(compras) − Σ(vendas) == Holding.Quantity
@@ -69,38 +72,68 @@ public class HoldingInvariantTests
     [Fact]
     public async Task Invariante3_MesmoConjuntoDeTransacoes_ProduzMesmaPosicao_IndependenteDaOrdemDeInsercao()
     {
-        // Compra e venda com ExecutedAt IDÊNTICO — empate que o replay precisa desempatar
-        // de forma estável. Sem critério de desempate, a ordem de inserção decide o resultado.
-        var instante = T0;
+        // Compra e venda com ExecutedAt IDÊNTICO, ambas com lastro em qualquer ordem de
+        // digitação. Sem critério de desempate que dependa apenas dos DADOS, a ordem de
+        // inserção decide o custo médio final.
+        var instante = T1;
 
-        decimal QuantidadeApos(bool compraPrimeiro)
+        (decimal Qty, decimal AvgCost) PosicaoApos(bool compraPrimeiro)
         {
             using var t = new TestDb();
             var coin = t.AddCoin("BTC");
             var svc = new PortfolioService(t.Db);
 
-            var compra = Buy(coin.Id, 1m, 100_000m, instante);
-            var venda = Sell(coin.Id, 1m, 120_000m, instante);
+            // Posição inicial, para que a venda no instante empatado tenha lastro
+            // independentemente da ordem em que o par empatado for digitado.
+            var inicial = svc.CreateTransactionAsync(Buy(coin.Id, 2m, 100_000m, T0)).GetAwaiter().GetResult();
+            Assert.True(inicial.Success, inicial.Error);
 
-            if (compraPrimeiro)
-            {
-                svc.CreateTransactionAsync(compra).GetAwaiter().GetResult();
-                svc.CreateTransactionAsync(venda).GetAwaiter().GetResult();
-            }
-            else
-            {
-                svc.CreateTransactionAsync(venda).GetAwaiter().GetResult();
-                svc.CreateTransactionAsync(compra).GetAwaiter().GetResult();
-            }
+            var compra = Buy(coin.Id, 1m, 120_000m, instante);
+            var venda = Sell(coin.Id, 1m, 130_000m, instante);
 
-            return t.HoldingFor(coin.Id)?.Quantity ?? 0m;
+            var primeira = svc.CreateTransactionAsync(compraPrimeiro ? compra : venda).GetAwaiter().GetResult();
+            var segunda = svc.CreateTransactionAsync(compraPrimeiro ? venda : compra).GetAwaiter().GetResult();
+            Assert.True(primeira.Success, primeira.Error);
+            Assert.True(segunda.Success, segunda.Error);
+
+            var h = t.HoldingFor(coin.Id)!;
+            return (h.Quantity, h.AvgCostBrl);
         }
 
-        var compraPrimeiro = QuantidadeApos(true);
-        var vendaPrimeiro = QuantidadeApos(false);
+        var compraPrimeiro = PosicaoApos(true);
+        var vendaPrimeiro = PosicaoApos(false);
 
-        Assert.Equal(compraPrimeiro, vendaPrimeiro);
+        Assert.Equal(compraPrimeiro.Qty, vendaPrimeiro.Qty);
+        Assert.Equal(compraPrimeiro.AvgCost, vendaPrimeiro.AvgCost);
         await Task.CompletedTask;
+    }
+
+    [Fact]
+    public void Invariante3b_ReplayEhDeterministico_IndependenteDaOrdemDasLinhasVindasDoBanco()
+    {
+        // Sem ORDER BY, o banco não garante a ordem das linhas — e o plano de execução pode
+        // mudar quando a tabela cresce ou um índice é criado. O replay tem de produzir o
+        // mesmo número para qualquer permutação da mesma entrada.
+        var txs = new List<Transaction>
+        {
+            new() { Id = 1, CoinId = 1, Type = TransactionType.Buy,  Quantity = 2m,   TotalBrl = 200_000m, FeeBrl = 40m, ExecutedAt = T0 },
+            new() { Id = 2, CoinId = 1, Type = TransactionType.Buy,  Quantity = 1m,   TotalBrl = 120_000m, FeeBrl = 25m, ExecutedAt = T1 },
+            new() { Id = 3, CoinId = 1, Type = TransactionType.Sell, Quantity = 1m,   TotalBrl = 130_000m, FeeBrl = 30m, ExecutedAt = T1 },
+            new() { Id = 4, CoinId = 1, Type = TransactionType.Buy,  Quantity = 0.5m, TotalBrl = 70_000m,  FeeBrl = 10m, ExecutedAt = T1 },
+            new() { Id = 5, CoinId = 1, Type = TransactionType.Sell, Quantity = 0.5m, TotalBrl = 72_000m,  FeeBrl = 12m, ExecutedAt = T2 },
+        };
+
+        var referencia = HoldingRecalculator.Replay(txs);
+        var rng = new Random(7);
+
+        for (var i = 0; i < 200; i++)
+        {
+            var embaralhado = txs.OrderBy(_ => rng.Next()).ToList();
+            var resultado = HoldingRecalculator.Replay(embaralhado);
+
+            Assert.Equal(referencia.Quantity, resultado.Quantity);
+            Assert.Equal(referencia.AvgCostBrl, resultado.AvgCostBrl);
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -156,19 +189,42 @@ public class HoldingInvariantTests
     [Fact]
     public async Task Invariante5b_VendaExcedente_NaoPodeDeixarRazaoEPosicaoDivergentes()
     {
-        // Mesmo que a venda excedente fosse aceita por decisão de produto, razão e posição
-        // teriam de continuar contando a mesma história. Hoje divergem — e a divergência
-        // sempre INFLA a posição registrada.
+        // Razão e posição precisam contar a mesma história mesmo depois de uma tentativa
+        // de venda a descoberto. Antes divergiam — e a divergência sempre INFLAVA a posição.
         using var t = new TestDb();
         var coin = t.AddCoin("BTC");
         var svc = new PortfolioService(t.Db);
 
         await svc.CreateTransactionAsync(Buy(coin.Id, 1m, 100_000m, T0));
-        await svc.CreateTransactionAsync(Sell(coin.Id, 1.5m, 120_000m, T0.AddDays(1)));
+        var excedente = await svc.CreateTransactionAsync(Sell(coin.Id, 1.5m, 120_000m, T0.AddDays(1)));
         await svc.CreateTransactionAsync(Buy(coin.Id, 1m, 120_000m, T0.AddDays(2)));
+
+        Assert.False(excedente.Success, "a venda excedente deveria ter sido rejeitada");
 
         var holding = t.HoldingFor(coin.Id)!;
         Assert.Equal(t.LedgerNetQuantity(coin.Id), holding.Quantity);
+    }
+
+    [Fact]
+    public async Task Invariante5c_LancamentoRetroativo_QueTornaPosicaoFuturaNegativa_EhRejeitado()
+    {
+        // O saldo final não basta: uma venda retroativa pode ter lastro no instante dela e
+        // ainda assim deixar negativa uma posição posterior. Por isso o guard simula o razão
+        // inteiro, não apenas a posição corrente.
+        using var t = new TestDb();
+        var coin = t.AddCoin("BTC");
+        var svc = new PortfolioService(t.Db);
+
+        await svc.CreateTransactionAsync(Buy(coin.Id, 1m, 100_000m, T0));              // posição 1,0
+        await svc.CreateTransactionAsync(Sell(coin.Id, 1m, 130_000m, T0.AddDays(5)));  // posição 0,0
+
+        // Em T0+2 havia 1,0 BTC — a venda tem lastro naquele instante. Mas ela deixaria a
+        // venda de T0+5 sem lastro, levando a posição a −0,5.
+        var retroativa = await svc.CreateTransactionAsync(Sell(coin.Id, 0.5m, 120_000m, T0.AddDays(2)));
+
+        Assert.False(retroativa.Success,
+            "venda retroativa que torna negativa uma posição posterior deveria ser rejeitada");
+        Assert.Equal(t.LedgerNetQuantity(coin.Id), t.HoldingFor(coin.Id)!.Quantity);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
