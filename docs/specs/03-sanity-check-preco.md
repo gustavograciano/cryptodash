@@ -35,3 +35,18 @@ Guarda em `PriceSnapshotJob`, antes de aplicar cada cotação:
 ## Fora de escopo
 
 Circuit breaker e retry das integrações (Polly) — é a Fase 1 do roadmap.
+
+---
+
+## Verificação executada
+
+15 casos em `tests/CryptoDash.Application.Tests/PriceSanityTests.cs`, todos verdes.
+`PrecoEhPlausivel` é `internal`, exposta ao projeto de teste por `InternalsVisibleTo` em vez
+de virar API pública só para ser verificável.
+
+Cobertos: preço zero/negativo (com e sem snapshot anterior), primeira cotação sem base de
+comparação, 10× maior, 10× menor, fronteiras exatas da banda nos dois sentidos, e o caso de
+recuperação — snapshot anterior já zerado não pode prender a moeda, senão toda cotação nova
+pareceria variação infinita contra zero.
+
+**Status: concluída.**

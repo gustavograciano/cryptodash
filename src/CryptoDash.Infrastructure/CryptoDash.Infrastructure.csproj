@@ -27,4 +27,10 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Regras de sanidade dos jobs são internas: expostas ao projeto de teste em vez de
+         virarem API pública só para poderem ser verificadas. -->
+    <InternalsVisibleTo Include="CryptoDash.Application.Tests" />
+  </ItemGroup>
+
 </Project>
