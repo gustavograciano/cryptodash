@@ -90,7 +90,9 @@ GET  /api/v1/news/digest/today
 
 ## Segurança
 
-- Secrets nunca commitados (`.env*` no `.gitignore`).
+- Secrets em variáveis de ambiente; `.env` e `.env.production` no `.gitignore`.
+  Os arquivos `.env*.example` **são** versionados e contêm apenas placeholders — troque todos antes de subir.
+- `backups/` e `deploy/letsencrypt/` também ignorados: dumps do banco e chave privada TLS.
 - JWT key mínimo 32 chars (`openssl rand -hex 32`).
 - BCrypt work factor 12 para senhas.
 - HTTPS obrigatório em produção (Let's Encrypt).

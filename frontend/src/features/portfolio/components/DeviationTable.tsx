@@ -14,7 +14,7 @@ export default function DeviationTable({ items }: { items: AllocationItemDto[] }
             <th className="text-left font-normal py-2">Moeda</th>
             <th className="text-right font-normal">Atual</th>
             <th className="text-right font-normal">Alvo</th>
-            <th className="text-right font-normal">Desvio</th>
+            <th className="text-right font-normal" title="Desvio relativo ao alvo: (atual − alvo) / alvo">Desvio rel. ao alvo</th>
             <th className="text-right font-normal">Status</th>
           </tr>
         </thead>

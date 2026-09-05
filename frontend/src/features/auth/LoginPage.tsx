@@ -4,7 +4,7 @@ import { login } from './api';
 import { useAuthStore } from '@/stores/authStore';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('gustavo@cryptodash.local');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

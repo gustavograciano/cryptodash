@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { aportsApi } from '../api';
-import { formatBRL } from '@/lib/format';
+import { formatBRL, paraDatetimeLocal } from '@/lib/format';
 
 export default function AportExecuteModal({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient();
   const { data: next } = useQuery({ queryKey: ['aports', 'next'], queryFn: aportsApi.next });
-  const [executedAt, setExecutedAt] = useState(new Date().toISOString().slice(0, 16));
+  const [executedAt, setExecutedAt] = useState(paraDatetimeLocal());
   const [error, setError] = useState<string | null>(null);
 
   // Uma chave por abertura do modal — não por clique. É o que faz o reenvio depois de um

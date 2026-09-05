@@ -12,6 +12,12 @@ namespace CryptoDash.Application.Services;
 
 public class AportsService(IAppDbContext db)
 {
+    /// <summary>
+    /// Teto de sanidade do aporte mensal. Não é regra de negócio — é proteção contra dedo
+    /// gordo, na ausência de qualquer confirmação na interface.
+    /// </summary>
+    public const decimal TetoDoAporte = 10_000_000m;
+
     public async Task<AportPlanDto?> GetPlanAsync(CancellationToken ct = default)
     {
         var plan = await db.AportPlans.OrderByDescending(p => p.Id).FirstOrDefaultAsync(p => p.IsActive, ct);
@@ -21,6 +27,14 @@ public class AportsService(IAppDbContext db)
     public async Task<AportPlanDto> UpsertPlanAsync(UpdateAportPlanRequest req, CancellationToken ct = default)
     {
         if (req.DayOfMonth < 1 || req.DayOfMonth > 28) throw new ArgumentException("dayOfMonth deve estar entre 1 e 28");
+
+        // O dia era validado e o dinheiro não. Um amountBrl negativo era persistido com 200 e
+        // depois o DcaAllocator caía na guarda `aporteBrl <= 0`, devolvia lista vazia, e o card
+        // de aporte — o recurso principal do produto — morria em silêncio, sem erro na tela.
+        if (req.AmountBrl <= 0m)
+            throw new ArgumentException("amountBrl deve ser maior que zero");
+        if (req.AmountBrl > TetoDoAporte)
+            throw new ArgumentException($"amountBrl acima do teto de {TetoDoAporte:N0}");
         var plan = await db.AportPlans.OrderByDescending(p => p.Id).FirstOrDefaultAsync(ct);
         if (plan is null)
         {
@@ -206,18 +220,11 @@ public class AportsService(IAppDbContext db)
             CreatedAt = DateTimeOffset.UtcNow
         };
 
-        // A fronteira transacional é obtida por cast em vez de exposta em IAppDbContext.
-        // A premissa é verdadeira por construção — AppDbContext é a única implementação da
-        // interface e a DI registra literalmente a mesma instância — mas é uma premissa de
-        // RUNTIME: um provider sem suporte a transação (InMemory) ou uma segunda
-        // implementação falhariam aqui, não na compilação. Por isso a checagem é explícita
-        // e falha alto, em vez de degradar em silêncio para escrita sem transação.
-        if (db is not DbContext ctx)
-            throw new InvalidOperationException(
-                "IAppDbContext precisa ser um DbContext para que a execução de aporte seja atômica.");
-
+        // Fronteira transacional via DbTransactionScope: o cast para DbContext vive lá, agora
+        // que PortfolioService precisa do mesmo — era o critério do desenho aprovado,
+        // promover à abstração depois da segunda ocorrência.
         var comitou = false;
-        await using var trx = await ctx.Database.BeginTransactionAsync(ct);
+        await using var trx = await DbTransactionScope.BeginAsync(db, ct);
         try
         {
             // A chave é reivindicada no PRIMEIRO save, junto com as transações: o perdedor
@@ -244,7 +251,7 @@ public class AportsService(IAppDbContext db)
             // chave passou a existir. Se passou, perdemos a corrida — devolvemos a resposta
             // do vencedor. Se não, a exceção era outra coisa e precisa subir.
             await trx.RollbackAsync(CancellationToken.None);
-            ctx.ChangeTracker.Clear();
+            DbTransactionScope.ClearTracking(db);
 
             var vencedor = await db.AportsExecuted.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.IdempotencyKey == chave, ct);
@@ -255,7 +262,7 @@ public class AportsService(IAppDbContext db)
         {
             // Qualquer caminho que não comitou — cancelamento, timeout, falha no commit —
             // deixaria entidades rastreadas que um SaveChanges posterior ressuscitaria.
-            if (!comitou) ctx.ChangeTracker.Clear();
+            if (!comitou) DbTransactionScope.ClearTracking(db);
         }
 
         return Result<ExecuteAportResponse>.Ok(

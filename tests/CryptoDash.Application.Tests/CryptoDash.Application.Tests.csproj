@@ -22,6 +22,7 @@
     <ProjectReference Include="..\..\src\CryptoDash.Domain\CryptoDash.Domain.csproj" />
     <ProjectReference Include="..\..\src\CryptoDash.Application\CryptoDash.Application.csproj" />
     <ProjectReference Include="..\..\src\CryptoDash.Infrastructure\CryptoDash.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\CryptoDash.Api\CryptoDash.Api.csproj" />
   </ItemGroup>
 
 </Project>

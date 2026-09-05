@@ -8,7 +8,7 @@ namespace CryptoDash.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/v1/portfolio")]
-public class PortfolioController(PortfolioService portfolio) : ControllerBase
+public class PortfolioController(PortfolioService portfolio, ReconciliationService reconciliation) : ControllerBase
 {
     [HttpGet("summary")]
     public async Task<ActionResult<PortfolioSummaryDto>> Summary(CancellationToken ct)
@@ -42,6 +42,23 @@ public class PortfolioController(PortfolioService portfolio) : ControllerBase
             ? CreatedAtAction(nameof(ListTransactions), new { coinId = req.CoinId }, result.Value)
             : BadRequest(new { error = result.Error });
     }
+
+    /// <summary>Compara o razão com a posição. Vazio = as duas contam a mesma história.</summary>
+    [HttpGet("reconciliation")]
+    public async Task<IActionResult> Reconciliation(CancellationToken ct)
+    {
+        var r = await reconciliation.CheckAsync(ct);
+        // 409 quando há divergência: o número exibido no dashboard não é confiável, e um
+        // 200 faria monitoramento externo tratar isso como estado normal.
+        return r.IsHealthy ? Ok(r) : Conflict(r);
+    }
+
+    /// <summary>
+    /// Reconstrói posições a partir do razão. É o único reparo do sistema para divergência.
+    /// </summary>
+    [HttpPost("holdings/recalculate")]
+    public async Task<IActionResult> Recalculate([FromQuery] int? coinId, CancellationToken ct)
+        => Ok(await reconciliation.RecalculateAsync(coinId, ct));
 
     [HttpDelete("transactions/{id:int}")]
     public async Task<IActionResult> DeleteTransaction(int id, CancellationToken ct)

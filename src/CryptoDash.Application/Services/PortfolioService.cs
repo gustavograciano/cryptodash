@@ -14,11 +14,13 @@ public class PortfolioService(IAppDbContext db)
         var holdings = await db.Holdings
             .Include(h => h.Coin).ThenInclude(c => c.PriceSnapshot)
             .Include(h => h.Coin).ThenInclude(c => c.TargetAllocation)
-            .Where(h => h.Quantity > 0)
+            // != 0, não > 0: posição NEGATIVA é o sinal de razão corrompido, e filtrá-la
+            // fazia justamente a evidência do problema sumir do dashboard.
+            .Where(h => h.Quantity != 0)
             .ToListAsync(ct);
 
         var totalBrl = holdings.Sum(h => h.Quantity * (h.Coin.PriceSnapshot?.PriceBrl ?? 0m));
-        var totalCost = holdings.Sum(h => h.Quantity * h.AvgCostBrl);
+        var totalCost = holdings.Sum(h => h.TotalCostBrl);   // fato persistido, não reconstruído
         var totalPnl = totalBrl - totalCost;
         var totalPnlPct = totalCost == 0 ? 0 : Math.Round((totalPnl / totalCost) * 100m, 2);
 
@@ -53,7 +55,7 @@ public class PortfolioService(IAppDbContext db)
         {
             var price = h.Coin.PriceSnapshot?.PriceBrl ?? 0m;
             var value = h.Quantity * price;
-            var cost = h.Quantity * h.AvgCostBrl;
+            var cost = h.TotalCostBrl;
             var pnl = value - cost;
             var pnlPct = cost == 0 ? 0 : Math.Round((pnl / cost) * 100m, 2);
             return new HoldingDto(
@@ -172,11 +174,15 @@ public class PortfolioService(IAppDbContext db)
                 $"{req.ExecutedAt:yyyy-MM-dd HH:mm} (posição atual: {posicaoAtual}).");
         }
 
-        db.Transactions.Add(tx);
-        await db.SaveChangesAsync(ct);
-
-        await HoldingRecalculator.ApplyAsync(db, req.CoinId, ct);
-        await db.SaveChangesAsync(ct);
+        // Uma fronteira só: sem ela, o INSERT ficava commitado e o recálculo da posição podia
+        // não acontecer — o usuário via a compra listada e o patrimônio não mudava.
+        await ComRetryDeConcorrenciaAsync(async token =>
+        {
+            db.Transactions.Add(tx);
+            await db.SaveChangesAsync(token);          // materializa o Id para o replay
+            await HoldingRecalculator.ApplyAsync(db, req.CoinId, token);
+            return true;
+        }, ct);
 
         return Result<TransactionDto>.Ok(new TransactionDto(
             tx.Id, tx.CoinId, coin.Symbol, tx.Type,
@@ -204,10 +210,41 @@ public class PortfolioService(IAppDbContext db)
         var tx = await db.Transactions.FirstOrDefaultAsync(t => t.Id == id, ct);
         if (tx is null) return Result<bool>.Fail("Transação não encontrada");
         var coinId = tx.CoinId;
-        db.Transactions.Remove(tx);
-        await db.SaveChangesAsync(ct);
-        await HoldingRecalculator.ApplyAsync(db, coinId, ct);
-        await db.SaveChangesAsync(ct);
+        await ComRetryDeConcorrenciaAsync(async token =>
+        {
+            db.Transactions.Remove(tx);
+            await db.SaveChangesAsync(token);
+            await HoldingRecalculator.ApplyAsync(db, coinId, token);
+            return true;
+        }, ct);
         return Result<bool>.Ok(true);
+    }
+
+    /// <summary>
+    /// Executa a escrita numa transação e reprocessa quando outra requisição alterou a
+    /// posição no meio do caminho.
+    ///
+    /// O recálculo é read-modify-write do razão inteiro: sem token de concorrência, a última
+    /// escrita vencia com dado obsoleto e a posição divergia do razão em silêncio. Com o
+    /// token, o conflito vira exceção — e reprocessar é a resposta certa, porque o replay é
+    /// determinístico: refazer sobre o estado novo dá o resultado correto.
+    /// </summary>
+    private async Task ComRetryDeConcorrenciaAsync(Func<CancellationToken, Task<bool>> trabalho, CancellationToken ct)
+    {
+        const int maxTentativas = 3;
+        for (var tentativa = 1; ; tentativa++)
+        {
+            try
+            {
+                await DbTransactionScope.ExecuteAsync(db, trabalho, ct);
+                return;
+            }
+            catch (DbUpdateConcurrencyException) when (tentativa < maxTentativas)
+            {
+                // ExecuteAsync já fez rollback e limpou o tracker; a próxima tentativa relê
+                // do zero.
+                DbTransactionScope.ClearTracking(db);
+            }
+        }
     }
 }

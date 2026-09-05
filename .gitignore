@@ -15,3 +15,10 @@ dist/
 *.db-wal
 *.log
 .DS_Store
+
+# Dumps do banco e chave privada TLS: um `git add .` no servidor commitaria o
+# histórico financeiro inteiro e o material criptográfico do domínio.
+backups/
+deploy/letsencrypt/
+*.pem
+*.key

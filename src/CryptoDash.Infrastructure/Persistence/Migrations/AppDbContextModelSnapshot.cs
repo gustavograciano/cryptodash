@@ -228,8 +228,8 @@ namespace CryptoDash.Infrastructure.Persistence.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<decimal>("AvgCostBrl")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
+                        .HasPrecision(20, 10)
+                        .HasColumnType("numeric(20,10)")
                         .HasColumnName("avg_cost_brl");
 
                     b.Property<int>("CoinId")
@@ -241,9 +241,19 @@ namespace CryptoDash.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(20,10)")
                         .HasColumnName("quantity");
 
+                    b.Property<decimal>("TotalCostBrl")
+                        .HasPrecision(20, 10)
+                        .HasColumnType("numeric(20,10)")
+                        .HasColumnName("total_cost_brl");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
 
                     b.HasKey("Id")
                         .HasName("pk_holdings");
@@ -384,6 +394,10 @@ namespace CryptoDash.Infrastructure.Persistence.Migrations
                         .HasColumnType("date")
                         .HasColumnName("date");
 
+                    b.Property<bool>("HasIntraday")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_intraday");
+
                     b.Property<decimal>("HighBrl")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
@@ -451,13 +465,13 @@ namespace CryptoDash.Infrastructure.Persistence.Migrations
                         .HasColumnName("market_cap_brl");
 
                     b.Property<decimal>("PriceBrl")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
+                        .HasPrecision(20, 10)
+                        .HasColumnType("numeric(20,10)")
                         .HasColumnName("price_brl");
 
                     b.Property<decimal>("PriceUsd")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
+                        .HasPrecision(20, 10)
+                        .HasColumnType("numeric(20,10)")
                         .HasColumnName("price_usd");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
@@ -541,8 +555,8 @@ namespace CryptoDash.Infrastructure.Persistence.Migrations
                         .HasColumnName("notes");
 
                     b.Property<decimal>("PriceBrl")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
+                        .HasPrecision(20, 10)
+                        .HasColumnType("numeric(20,10)")
                         .HasColumnName("price_brl");
 
                     b.Property<decimal>("Quantity")

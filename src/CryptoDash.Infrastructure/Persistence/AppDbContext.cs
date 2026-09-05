@@ -50,7 +50,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             e.HasIndex(h => h.CoinId).IsUnique();
             e.Property(h => h.Quantity).HasPrecision(20, 10);
-            e.Property(h => h.AvgCostBrl).HasPrecision(18, 2);
+            e.Property(h => h.AvgCostBrl).HasPrecision(20, 10);
+            e.Property(h => h.TotalCostBrl).HasPrecision(20, 10);
+            e.Property(h => h.Version).IsConcurrencyToken();
             e.HasOne(h => h.Coin).WithOne(c => c.Holding)
                 .HasForeignKey<Holding>(h => h.CoinId);
         });
@@ -60,7 +62,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasIndex(t => new { t.CoinId, t.ExecutedAt });
             e.Property(t => t.Type).HasConversion<string>().HasMaxLength(10);
             e.Property(t => t.Quantity).HasPrecision(20, 10);
-            e.Property(t => t.PriceBrl).HasPrecision(18, 2);
+            e.Property(t => t.PriceBrl).HasPrecision(20, 10);
             e.Property(t => t.TotalBrl).HasPrecision(18, 2);
             e.Property(t => t.FeeBrl).HasPrecision(18, 2);
             e.HasOne(t => t.Coin).WithMany(c => c.Transactions).HasForeignKey(t => t.CoinId);
@@ -71,8 +73,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasKey(p => p.CoinId);
             e.HasOne(p => p.Coin).WithOne(c => c.PriceSnapshot)
                 .HasForeignKey<PriceSnapshot>(p => p.CoinId);
-            e.Property(p => p.PriceBrl).HasPrecision(18, 2);
-            e.Property(p => p.PriceUsd).HasPrecision(18, 2);
+            e.Property(p => p.PriceBrl).HasPrecision(20, 10);
+            e.Property(p => p.PriceUsd).HasPrecision(20, 10);
             e.Property(p => p.Change24hPct).HasPrecision(8, 2);
             e.Property(p => p.Change7dPct).HasPrecision(8, 2);
             e.Property(p => p.Change30dPct).HasPrecision(8, 2);

@@ -1,5 +1,6 @@
 using CryptoDash.Application.Abstractions;
 using CryptoDash.Infrastructure.Auth;
+using CryptoDash.Infrastructure.External;
 using CryptoDash.Infrastructure.External.AlternativeMe;
 using CryptoDash.Infrastructure.External.Anthropic;
 using CryptoDash.Infrastructure.External.CoinGecko;
@@ -38,38 +39,47 @@ public static class DependencyInjection
         services.AddScoped<IJwtTokenService, JwtTokenService>();
 
         var coingeckoBase = config["CoinGecko:BaseUrl"] ?? "https://api.coingecko.com/api/v3";
-        services.AddRefitClient<ICoinGeckoApi>()
+        ResilienciaHttp.Aplicar(services.AddRefitClient<ICoinGeckoApi>()
             .ConfigureHttpClient(c =>
             {
+                // Timeout por tentativa; o total fica a cargo da política.
                 c.BaseAddress = new Uri(coingeckoBase);
                 c.Timeout = TimeSpan.FromSeconds(15);
                 c.DefaultRequestHeaders.Add("User-Agent", "CryptoDash/1.0");
                 c.DefaultRequestHeaders.Add("Accept", "application/json");
-            });
+            }), tentativas: 3, atrasoBase: TimeSpan.FromSeconds(2), timeoutTotal: TimeSpan.FromSeconds(60));
         services.AddScoped<IPriceFeed, CoinGeckoPriceFeed>();
         services.AddScoped<IMarketDataFeed, CoinGeckoMarketDataFeed>();
 
         var altBase = config["AlternativeMe:BaseUrl"] ?? "https://api.alternative.me";
-        services.AddRefitClient<IAlternativeMeApi>()
+        ResilienciaHttp.Aplicar(services.AddRefitClient<IAlternativeMeApi>()
             .ConfigureHttpClient(c =>
             {
                 c.BaseAddress = new Uri(altBase);
                 c.Timeout = TimeSpan.FromSeconds(15);
-            });
+            }), tentativas: 3, atrasoBase: TimeSpan.FromSeconds(2), timeoutTotal: TimeSpan.FromSeconds(60));
         services.AddScoped<IFearGreedFeed, AlternativeMeFearGreedFeed>();
 
         var cpBase = config["CryptoPanic:BaseUrl"] ?? "https://cryptopanic.com/api/v1";
-        services.AddRefitClient<ICryptoPanicApi>()
-            .ConfigureHttpClient(c => { c.BaseAddress = new Uri(cpBase); c.Timeout = TimeSpan.FromSeconds(15); });
+        ResilienciaHttp.Aplicar(services.AddRefitClient<ICryptoPanicApi>()
+            .ConfigureHttpClient(c => { c.BaseAddress = new Uri(cpBase); c.Timeout = TimeSpan.FromSeconds(15); }),
+            tentativas: 2, atrasoBase: TimeSpan.FromSeconds(3), timeoutTotal: TimeSpan.FromSeconds(60));
         services.AddScoped<INewsFeed, CryptoPanicNewsFeed>();
 
         var anthBase = config["Anthropic:BaseUrl"] ?? "https://api.anthropic.com";
-        services.AddRefitClient<IAnthropicApi>()
-            .ConfigureHttpClient(c => { c.BaseAddress = new Uri(anthBase); c.Timeout = TimeSpan.FromSeconds(60); });
+        // A Anthropic é cara e lenta: uma tentativa extra, não três. Repetir uma geração que
+        // já consumiu tokens é gastar duas vezes pelo mesmo resultado.
+        ResilienciaHttp.Aplicar(services.AddRefitClient<IAnthropicApi>()
+            .ConfigureHttpClient(c => { c.BaseAddress = new Uri(anthBase); c.Timeout = TimeSpan.FromSeconds(60); }),
+            tentativas: 1, atrasoBase: TimeSpan.FromSeconds(5), timeoutTotal: TimeSpan.FromSeconds(150));
         services.AddScoped<ILlmDigestGenerator, AnthropicDigestGenerator>();
 
         services.AddQuartz(q =>
         {
+            // Sem listener, exceção em job vira silêncio: o dado do dia não existe e nada
+            // indica por quê.
+            q.AddJobListener<JobFailureListener>();
+
             var snapKey = new JobKey("PriceSnapshotJob");
             q.AddJob<PriceSnapshotJob>(opts => opts.WithIdentity(snapKey));
             q.AddTrigger(t => t.ForJob(snapKey)
@@ -103,12 +113,20 @@ public static class DependencyInjection
                 .WithIdentity("AIDigestJob-trigger")
                 .WithCronSchedule("0 0 7 * * ?"));
 
+            var recKey = new JobKey("ReconciliationJob");
+            q.AddJob<ReconciliationJob>(opts => opts.WithIdentity(recKey));
+            q.AddTrigger(t => t.ForJob(recKey)
+                .WithIdentity("ReconciliationJob-trigger")
+                .StartAt(DateTimeOffset.UtcNow.AddMinutes(5))
+                .WithCronSchedule("0 30 * * * ?"));
+
             var remKey = new JobKey("AportReminderJob");
             q.AddJob<AportReminderJob>(opts => opts.WithIdentity(remKey));
             q.AddTrigger(t => t.ForJob(remKey)
                 .WithIdentity("AportReminderJob-trigger")
                 .WithCronSchedule("0 0 9 * * ?"));
         });
+        services.AddSingleton<JobFailureListener>();
         services.AddQuartzHostedService(o => o.WaitForJobsToComplete = true);
 
         return services;

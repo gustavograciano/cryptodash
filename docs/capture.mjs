@@ -7,7 +7,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(__dirname, 'screenshots');
 const URL_BASE = process.env.URL_BASE ?? 'http://localhost:5174';
 const EMAIL = process.env.SEED_EMAIL ?? 'gustavo@cryptodash.local';
-const PASSWORD = process.env.SEED_PASSWORD ?? 'ChangeMe@123';
+const PASSWORD = process.env.SEED_PASSWORD;
+if (!PASSWORD) {
+  console.error('Defina SEED_PASSWORD antes de rodar a captura.');
+  process.exit(1);
+}
 
 await mkdir(OUT, { recursive: true });
 

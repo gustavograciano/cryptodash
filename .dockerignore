@@ -7,3 +7,14 @@
 .vscode
 **/*.user
 frontend/.vite
+
+# Segredos e banco local fora do contexto de build: o que entra no contexto pode
+# acabar numa camada de imagem.
+.env
+.env.*
+!.env*.example
+**/*.db
+**/*.db-shm
+**/*.db-wal
+backups/
+deploy/letsencrypt/
